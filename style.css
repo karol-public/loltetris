@@ -257,27 +257,40 @@ canvas {
 
     .game-info {
         flex-direction: row;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         justify-content: space-between;
         align-items: center;
         width: 100%;
-        padding: 0 1rem;
+        padding: 0 0.5rem;
         min-width: 0;
+        gap: 0.5rem;
     }
 
     h1 {
-        font-size: 1.5rem;
+        font-size: 1rem;
         width: auto;
         margin-bottom: 0;
+        line-height: 1.2;
+        text-align: left;
     }
 
     .score-board {
         padding: 0.25rem 0.5rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-width: 50px;
+    }
+
+    .score-label {
+        font-size: 0.6rem;
+        margin-bottom: 0;
     }
 
     #score,
     #level {
-        font-size: 1.2rem;
+        font-size: 1rem;
+        line-height: 1;
     }
 
     .controls-info {
@@ -289,9 +302,12 @@ canvas {
     #action-btn {
         display: block;
         padding: 0.5rem;
-        font-size: 1rem;
-        width: 100%;
-        margin-top: 5px;
+        font-size: 0.8rem;
+        width: auto;
+        margin-top: 0;
+        min-height: auto;
+        white-space: nowrap;
+        flex-shrink: 0;
     }
 
     canvas {

@@ -419,7 +419,8 @@ class Game {
         this.resumeBtn.addEventListener('click', () => this.togglePause());
 
         // Reward Dismissal
-        this.rewardContainer.addEventListener('click', () => {
+        const dismissReward = (e) => {
+            if (e.type === 'touchstart') e.preventDefault(); // Prevent ghost clicks
             if (this.isRewardActive) {
                 this.isRewardActive = false;
                 this.isPaused = false;
@@ -430,7 +431,10 @@ class Game {
                 this.lastTime = performance.now();
                 requestAnimationFrame(this.loop);
             }
-        });
+        };
+
+        this.rewardContainer.addEventListener('click', dismissReward);
+        this.rewardContainer.addEventListener('touchstart', dismissReward, { passive: false });
 
         // Handle visibility change to auto-pause
         document.addEventListener('visibilitychange', () => {
