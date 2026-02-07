@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LOLTETRIS</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -28,7 +28,7 @@
                 </div>
                 <button id="start-btn">I CAN HAS GAME?</button>
             </div>
-            <canvas id="game-canvas" width="300" height="600"></canvas>
+            <canvas id="game-canvas"></canvas>
 
             <!-- Reward Container -->
             <div id="reward-container">
@@ -43,13 +43,6 @@
             <div id="pause-overlay" class="overlay hidden">
                 <h2>PAUSED</h2>
                 <button id="resume-btn">RESUME PLZ</button>
-            </div>
-            <div class="mobile-controls">
-                <button id="btn-left" class="control-btn">←</button>
-                <button id="btn-rotate" class="control-btn">↻</button>
-                <button id="btn-right" class="control-btn">→</button>
-                <button id="btn-down" class="control-btn">↓</button>
-                <button id="btn-drop" class="control-btn">⤓</button>
             </div>
         </div>
     </div>

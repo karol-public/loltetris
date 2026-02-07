@@ -161,9 +161,11 @@ class Renderer {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.grid = grid;
-        this.blockSize = blockSize;
+        this.updateSize(blockSize);
+    }
 
-        // Adjust canvas size based on grid dimensions
+    updateSize(blockSize) {
+        this.blockSize = blockSize;
         this.canvas.width = this.grid.width * this.blockSize;
         this.canvas.height = this.grid.height * this.blockSize;
     }
@@ -230,7 +232,7 @@ class Input {
     constructor(game) {
         this.game = game;
         this.setupListeners();
-        this.setupTouchControls();
+        this.setupSwipeControls();
     }
 
     setupListeners() {
@@ -265,82 +267,69 @@ class Input {
         }
     }
 
-    setupTouchControls() {
-        // Helper to prevent default behavior (scrolling/zooming)
+    setupSwipeControls() {
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+
+        const minSwipeDistance = 30; // Minimum distance for a swipe
+
+        const handleGesture = () => {
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                // Horizontal Swipe
+                if (Math.abs(deltaX) > minSwipeDistance) {
+                    if (deltaX > 0) {
+                        // Right
+                        this.game.move(1);
+                    } else {
+                        // Left
+                        this.game.move(-1);
+                    }
+                }
+            } else {
+                // Vertical Swipe
+                if (Math.abs(deltaY) > minSwipeDistance) {
+                    if (deltaY > 0) {
+                        // Down - Soft Drop (speed up)
+                        this.game.drop();
+                        // Optional: Repeat drop if needed, but single swipe = single drop step 
+                        // feels better for control unless holding. 
+                        // User asked for "move fast down", so maybe hard drop?
+                        // Or multiple drops? Let's stick to single drop per swipe for precision, 
+                        // or maybe a small loop.
+                        // Let's try executing 2 drops for a downward "flick" to feel faster?
+                        // Actually, standard behavior: Down swipe = Soft Drop (often continuous).
+                        // Let's just do one drop for now to avoid accidental hard drops.
+                    } else {
+                        // Up - Rotate
+                        this.game.rotate();
+                    }
+                }
+            }
+        };
+
         const preventDefault = (e) => {
-            if (e.cancelable && e.target.id !== 'start-btn') {
+            if (e.target.id !== 'start-btn' && e.target.id !== 'restart-btn' && e.target.id !== 'resume-btn') {
                 e.preventDefault();
             }
         };
 
-        const setupButton = (id, action, repeat = false) => {
-            const btn = document.getElementById(id);
-            if (!btn) return;
+        document.addEventListener('touchstart', (e) => {
+            preventDefault(e);
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }, { passive: false });
 
-            let intervalId = null;
-            let timeoutId = null;
-            const initialDelay = 200; // Delay before repeat starts
-            const repeatSpeed = 50;   // Speed of repeat
-
-            const startAction = (e) => {
-                preventDefault(e);
-                if (this.game.isGameOver && id !== 'start-btn') return;
-                
-                // Visual feedback
-                btn.classList.add('active');
-
-                // Perform first action immediately
-                action();
-
-                if (repeat) {
-                    // Clear any existing timers just in case
-                    stopAction();
-                    
-                    // Wait for delay then start repeating
-                    timeoutId = setTimeout(() => {
-                        intervalId = setInterval(() => {
-                            if (this.game.isGameOver) {
-                                stopAction();
-                                return;
-                            }
-                            action();
-                        }, repeatSpeed);
-                    }, initialDelay);
-                }
-            };
-
-            const stopAction = (e) => {
-                if (e) preventDefault(e);
-                btn.classList.remove('active');
-                if (timeoutId) {
-                    clearTimeout(timeoutId);
-                    timeoutId = null;
-                }
-                if (intervalId) {
-                    clearInterval(intervalId);
-                    intervalId = null;
-                }
-            };
-
-            // Touch events
-            btn.addEventListener('touchstart', startAction, { passive: false });
-            btn.addEventListener('touchend', stopAction);
-            btn.addEventListener('touchcancel', stopAction);
-
-            // Mouse events
-            btn.addEventListener('mousedown', startAction);
-            btn.addEventListener('mouseup', stopAction);
-            btn.addEventListener('mouseleave', stopAction);
-        };
-
-        // Movement - Auto Repeat
-        setupButton('btn-left', () => this.game.move(-1), true);
-        setupButton('btn-right', () => this.game.move(1), true);
-        setupButton('btn-down', () => this.game.drop(), true);
-
-        // Actions - Single Fire
-        setupButton('btn-rotate', () => this.game.rotate(), false);
-        setupButton('btn-drop', () => this.game.hardDrop(), false);
+        document.addEventListener('touchend', (e) => {
+            preventDefault(e);
+            touchEndX = e.changedTouches[0].screenX;
+            touchEndY = e.changedTouches[0].screenY;
+            handleGesture();
+        }, { passive: false });
     }
 }
 
@@ -349,7 +338,11 @@ class Game {
     constructor() {
         this.canvas = document.getElementById('game-canvas');
         this.grid = new Grid(10, 20);
-        this.renderer = new Renderer(this.canvas, this.grid);
+
+        // Initial Resize to set dimensions before Renderer init
+        this.resize();
+
+        this.renderer = new Renderer(this.canvas, this.grid, this.blockSize);
         this.input = new Input(this);
 
         this.scoreElement = document.getElementById('score');
@@ -378,6 +371,32 @@ class Game {
 
         this.loop = this.loop.bind(this);
         this.setupUIListeners();
+
+        // Window Resize Listener
+        window.addEventListener('resize', () => {
+            this.resize();
+            // Update renderer's block size and canvas size
+            this.renderer.updateSize(this.blockSize);
+            this.renderer.draw(this.activeTetromino);
+        });
+    }
+
+    resize() {
+        const padding = 40; // Space for headers/score
+        const availableHeight = window.innerHeight - document.querySelector('.game-info').offsetHeight - padding;
+        const availableWidth = window.innerWidth - padding;
+
+        const maxBlockHeight = Math.floor(availableHeight / this.grid.height);
+        const maxBlockWidth = Math.floor(availableWidth / this.grid.width);
+
+        // Use the smaller dimension to fit within screen
+        this.blockSize = Math.max(15, Math.min(30, maxBlockHeight, maxBlockWidth));
+
+        // Update canvas dimensions
+        if (this.canvas) {
+            this.canvas.width = this.grid.width * this.blockSize;
+            this.canvas.height = this.grid.height * this.blockSize;
+        }
     }
 
     setupUIListeners() {
