@@ -294,16 +294,8 @@ class Input {
                 // Vertical Swipe
                 if (Math.abs(deltaY) > minSwipeDistance) {
                     if (deltaY > 0) {
-                        // Down - Soft Drop (speed up)
-                        this.game.drop();
-                        // Optional: Repeat drop if needed, but single swipe = single drop step 
-                        // feels better for control unless holding. 
-                        // User asked for "move fast down", so maybe hard drop?
-                        // Or multiple drops? Let's stick to single drop per swipe for precision, 
-                        // or maybe a small loop.
-                        // Let's try executing 2 drops for a downward "flick" to feel faster?
-                        // Actually, standard behavior: Down swipe = Soft Drop (often continuous).
-                        // Let's just do one drop for now to avoid accidental hard drops.
+                        // Down - Hard Drop (instant bottom)
+                        this.game.hardDrop();
                     } else {
                         // Up - Rotate
                         this.game.rotate();
@@ -313,7 +305,7 @@ class Input {
         };
 
         const preventDefault = (e) => {
-            if (e.target.id !== 'start-btn' && e.target.id !== 'restart-btn' && e.target.id !== 'resume-btn') {
+            if (e.target.id !== 'action-btn' && e.target.id !== 'restart-btn' && e.target.id !== 'resume-btn' && e.target.closest('#reward-container')) {
                 e.preventDefault();
             }
         };
@@ -351,10 +343,12 @@ class Game {
 
         this.gameOverOverlay = document.getElementById('game-over-overlay');
         this.pauseOverlay = document.getElementById('pause-overlay');
-        this.startBtn = document.getElementById('start-btn');
+        this.actionBtn = document.getElementById('action-btn');
         this.restartBtn = document.getElementById('restart-btn');
         this.resumeBtn = document.getElementById('resume-btn');
-        this.pauseBtn = document.getElementById('pause-btn');
+
+        // Reward element
+        this.rewardContainer = document.getElementById('reward-container');
 
         this.score = 0;
         this.level = 1;
@@ -364,6 +358,7 @@ class Game {
         this.isGameOver = false;
         this.isRunning = false;
         this.isPaused = false;
+        this.isRewardActive = false; // New state for reward pause
 
         this.lastTime = 0;
         this.dropCounter = 0;
@@ -405,12 +400,41 @@ class Game {
             this.start();
         });
 
-        this.pauseBtn.addEventListener('click', () => this.togglePause());
+        // Combined Action Button Logic
+        this.actionBtn.addEventListener('click', () => {
+            if (!this.isRunning && !this.isGameOver) {
+                // Initial Start
+                this.start();
+            } else if (this.isGameOver) {
+                // Restart
+                this.gameOverOverlay.classList.add('hidden');
+                this.start();
+            } else {
+                // Toggle Pause
+                this.togglePause();
+            }
+            this.actionBtn.blur();
+        });
+
         this.resumeBtn.addEventListener('click', () => this.togglePause());
+
+        // Reward Dismissal
+        this.rewardContainer.addEventListener('click', () => {
+            if (this.isRewardActive) {
+                this.isRewardActive = false;
+                this.isPaused = false;
+                this.rewardContainer.classList.remove('show');
+                this.updateActionButton();
+
+                // Resume loop
+                this.lastTime = performance.now();
+                requestAnimationFrame(this.loop);
+            }
+        });
 
         // Handle visibility change to auto-pause
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden && this.isRunning && !this.isPaused) {
+            if (document.hidden && this.isRunning && !this.isPaused && !this.isRewardActive) {
                 this.togglePause();
             }
         });
@@ -428,8 +452,8 @@ class Game {
         this.isGameOver = false;
         this.isRunning = true;
         this.isPaused = false;
-        this.startBtn.textContent = "PLAYING...";
-        this.startBtn.disabled = true;
+        this.isRewardActive = false;
+        this.updateActionButton();
 
         this.spawnTetromino();
 
@@ -442,12 +466,26 @@ class Game {
         if (!this.isRunning || this.isGameOver) return;
 
         this.isPaused = !this.isPaused;
+        this.updateActionButton();
+
         if (this.isPaused) {
             this.pauseOverlay.classList.remove('hidden');
         } else {
             this.pauseOverlay.classList.add('hidden');
             this.lastTime = performance.now();
             requestAnimationFrame(this.loop);
+        }
+    }
+
+    updateActionButton() {
+        if (this.isGameOver) {
+            this.actionBtn.textContent = "PLZ PLAY AGAIN?";
+        } else if (this.isPaused || this.isRewardActive) {
+            this.actionBtn.textContent = "RESUME";
+        } else if (this.isRunning) {
+            this.actionBtn.textContent = "PAUSE";
+        } else {
+            this.actionBtn.textContent = "I CAN HAS GAME?";
         }
     }
 
@@ -560,18 +598,21 @@ class Game {
         rewardImage.src = randomCat;
         rewardContainer.classList.add('show');
 
-        // Hide after 2 seconds
-        if (this.rewardTimeout) clearTimeout(this.rewardTimeout);
-        this.rewardTimeout = setTimeout(() => {
-            rewardContainer.classList.remove('show');
-        }, 2000);
+        // Pause game logic
+        this.isPaused = true;
+        this.isRewardActive = true;
+        this.updateActionButton();
+
+        rewardImage.src = randomCat;
+        rewardContainer.classList.add('show');
+
+        // No timeout - wait for user click to dismiss in UI listener
     }
 
     gameOver() {
         this.isRunning = false;
         this.isGameOver = true;
-        this.startBtn.textContent = "I CAN HAS GAME?";
-        this.startBtn.disabled = false;
+        this.updateActionButton();
 
         // Show grumpy cat on game over
         const rewardContainer = document.getElementById('reward-container');

@@ -179,51 +179,59 @@ canvas {
     font-weight: bold;
 }
 
-#pause-btn {
-    position: static;
-    width: 40px;
-    height: 40px;
-    padding: 0.25rem;
-    background: rgba(255, 255, 255, 0.8);
-    border: 2px solid var(--accent-color);
-    order: 10;
-    /* Ensure it's at the end or specific place */
-}
-
 /* Check overlap, maybe adjust font sizes if needed */
 
-#start-btn {
+/* Reward Cat Popup */
+#reward-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    /* Use flex to center */
+    justify-content: center;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.5);
+    /* Dim background */
+    opacity: 0;
+    pointer-events: none;
+    /* Initially none */
+    transition: opacity 0.3s;
+    z-index: 20;
+}
+
+#reward-container.show {
+    opacity: 1;
+    pointer-events: auto;
+    /* Enable clicking */
+    transform: none;
+    /* Reset distinct transform if used before, moving to simple opacity fade for full screen overlay */
+}
+
+#reward-image {
+    max-width: 80%;
+    max-height: 80%;
+    border: 8px solid white;
+    border-radius: 1rem;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    transform: rotate(-3deg) scale(0.8);
+    transition: transform 0.3s;
+}
+
+#reward-container.show #reward-image {
+    transform: rotate(-3deg) scale(1);
+}
+
+#action-btn {
     display: block;
-    /* Show start button */
     padding: 0.5rem 1rem;
     font-size: 1rem;
     width: 100%;
     margin-top: 0.5rem;
     order: 20;
-    /* Ensure it's at the bottom of the flex container */
-}
-
-/* Reward Cat Popup */
-#reward-container {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) scale(0);
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    z-index: 20;
-    pointer-events: none;
-}
-
-#reward-container.show {
-    transform: translate(-50%, -50%) scale(1);
-}
-
-#reward-image {
-    max-width: 300px;
-    border: 8px solid white;
-    border-radius: 1rem;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-    transform: rotate(-3deg);
+    min-height: 44px;
+    /* Touch target size */
 }
 
 @media (max-width: 768px),
@@ -278,7 +286,7 @@ canvas {
 
     /* Hide the button labels if they take too much space, or keep them small */
 
-    #start-btn {
+    #action-btn {
         display: block;
         padding: 0.5rem;
         font-size: 1rem;
