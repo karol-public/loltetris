@@ -180,24 +180,27 @@ canvas {
 }
 
 #pause-btn {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    background: white;
-    padding: 0.5rem;
-    color: var(--accent-color);
+    position: static;
+    width: 40px;
+    height: 40px;
+    padding: 0.25rem;
+    background: rgba(255, 255, 255, 0.8);
     border: 2px solid var(--accent-color);
-    border-bottom: 4px solid var(--accent-color);
-    border-radius: 50%;
-    width: 48px;
-    height: 48px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    order: 10;
+    /* Ensure it's at the end or specific place */
 }
 
-#pause-btn:hover {
-    background: #fdf2f8;
+/* Check overlap, maybe adjust font sizes if needed */
+
+#start-btn {
+    display: block;
+    /* Show start button */
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    width: 100%;
+    margin-top: 0.5rem;
+    order: 20;
+    /* Ensure it's at the bottom of the flex container */
 }
 
 /* Reward Cat Popup */
@@ -276,12 +279,11 @@ canvas {
     /* Hide the button labels if they take too much space, or keep them small */
 
     #start-btn {
-        display: none;
-        /* Hide start button on mobile if we auto-start or tap to start? 
-                        Wait, need a way to start. Let's keep it but make it small/overlay?
-                        Actually, keep it in flow for now. */
+        display: block;
         padding: 0.5rem;
         font-size: 1rem;
+        width: 100%;
+        margin-top: 5px;
     }
 
     canvas {
