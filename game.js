@@ -541,15 +541,27 @@ class Game {
     }
 
     resize() {
-        const padding = 40;
         const gameInfo = document.querySelector('.game-info');
-        const availableHeight = window.innerHeight - (gameInfo ? gameInfo.offsetHeight : 0) - padding;
-        const availableWidth = window.innerWidth - padding;
+        const touchControls = document.getElementById('touch-controls');
+        const isMobile = window.matchMedia('(max-width: 768px), (hover: none) and (pointer: coarse)').matches;
+
+        let availableHeight, availableWidth;
+
+        if (isMobile) {
+            const headerH = gameInfo ? gameInfo.offsetHeight : 0;
+            const touchH = touchControls ? touchControls.offsetHeight : 0;
+            availableHeight = window.innerHeight - headerH - touchH - 16;
+            availableWidth = window.innerWidth - 16;
+        } else {
+            const sidebarW = gameInfo ? gameInfo.offsetWidth : 0;
+            availableHeight = window.innerHeight - 120;
+            availableWidth = window.innerWidth - sidebarW - 120;
+        }
 
         const maxBlockHeight = Math.floor(availableHeight / this.grid.height);
         const maxBlockWidth = Math.floor(availableWidth / this.grid.width);
 
-        this.blockSize = Math.max(15, Math.min(30, maxBlockHeight, maxBlockWidth));
+        this.blockSize = Math.max(12, Math.min(30, maxBlockHeight, maxBlockWidth));
 
         if (this.canvas) {
             this.canvas.width = this.grid.width * this.blockSize;
