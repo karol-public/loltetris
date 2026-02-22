@@ -352,7 +352,6 @@ class Input {
         this.lastSwipeTime = 0;
         this.setupListeners();
         this.setupSwipeControls();
-        this.setupTouchButtons();
     }
 
     setupListeners() {
@@ -423,8 +422,7 @@ class Input {
 
         const preventDefault = (e) => {
             if (e.target.id !== 'action-btn' && e.target.id !== 'restart-btn' &&
-                e.target.id !== 'resume-btn' && !e.target.closest('#reward-container') &&
-                !e.target.closest('#touch-controls')) {
+                e.target.id !== 'resume-btn' && !e.target.closest('#reward-container')) {
                 e.preventDefault();
             }
         };
@@ -443,26 +441,6 @@ class Input {
         }, { passive: false });
     }
 
-    setupTouchButtons() {
-        const buttons = {
-            'touch-left': () => this.game.move(-1),
-            'touch-right': () => this.game.move(1),
-            'touch-rotate': () => this.game.rotate(),
-            'touch-drop': () => this.game.hardDrop(),
-            'touch-down': () => this.game.drop(),
-            'touch-hold': () => this.game.hold()
-        };
-
-        for (const [id, action] of Object.entries(buttons)) {
-            const btn = document.getElementById(id);
-            if (btn) {
-                btn.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    action();
-                }, { passive: false });
-            }
-        }
-    }
 }
 
 // Game
@@ -490,14 +468,8 @@ class Game {
         this.resumeBtn = document.getElementById('resume-btn');
 
         this.rewardContainer = document.getElementById('reward-container');
-        this.previewCanvases = [
-            document.getElementById('preview-canvas'),
-            document.getElementById('preview-canvas-desktop')
-        ].filter(Boolean);
-        this.holdCanvases = [
-            document.getElementById('hold-canvas'),
-            document.getElementById('hold-canvas-desktop')
-        ].filter(Boolean);
+        this.previewCanvas = document.getElementById('preview-canvas');
+        this.holdCanvas = document.getElementById('hold-canvas');
 
         // Game state
         this.score = 0;
@@ -548,16 +520,14 @@ class Game {
 
     resize() {
         const gameInfo = document.querySelector('.game-info');
-        const touchControls = document.getElementById('touch-controls');
         const isMobile = window.matchMedia('(max-width: 768px), (hover: none) and (pointer: coarse)').matches;
 
         let availableHeight, availableWidth;
 
         if (isMobile) {
             const headerH = gameInfo ? gameInfo.offsetHeight : 0;
-            const touchH = touchControls ? touchControls.offsetHeight : 0;
-            availableHeight = window.innerHeight - headerH - touchH - 16;
-            availableWidth = window.innerWidth - 16;
+            availableHeight = window.innerHeight - headerH - 8;
+            availableWidth = window.innerWidth - 8;
         } else {
             const sidebarW = gameInfo ? gameInfo.offsetWidth : 0;
             availableHeight = window.innerHeight - 120;
@@ -640,7 +610,7 @@ class Game {
         this.updateActionButton();
 
         // Clear hold canvas
-        for (const c of this.holdCanvases) this.renderer.drawPreview(c, null);
+        if (this.holdCanvas) this.renderer.drawPreview(this.holdCanvas, null);
 
         // Generate first next piece and spawn
         this.nextTetromino = getRandomTetromino();
@@ -688,7 +658,7 @@ class Game {
         this.canHold = true;
 
         // Update preview
-        for (const c of this.previewCanvases) this.renderer.drawPreview(c, this.nextTetromino);
+        if (this.previewCanvas) this.renderer.drawPreview(this.previewCanvas, this.nextTetromino);
 
         if (!this.grid.isValidPosition(this.activeTetromino)) {
             this.gameOver();
@@ -788,13 +758,13 @@ class Game {
             this.nextTetromino = getRandomTetromino();
             this.activeTetromino.x = Math.floor(this.grid.width / 2) - Math.floor(this.activeTetromino.matrix[0].length / 2);
             this.activeTetromino.y = 0;
-            for (const c of this.previewCanvases) this.renderer.drawPreview(c, this.nextTetromino);
+            if (this.previewCanvas) this.renderer.drawPreview(this.previewCanvas, this.nextTetromino);
         }
 
         this.holdTetromino = new Tetromino(currentKey);
         this.lockTimer = this.lockDelay;
 
-        for (const c of this.holdCanvases) this.renderer.drawPreview(c, this.holdTetromino);
+        if (this.holdCanvas) this.renderer.drawPreview(this.holdCanvas, this.holdTetromino);
 
         if (!this.grid.isValidPosition(this.activeTetromino)) {
             this.gameOver();
