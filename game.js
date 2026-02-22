@@ -186,7 +186,7 @@ class Renderer {
     }
 
     drawGridLines() {
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+        this.ctx.strokeStyle = 'rgba(219, 39, 119, 0.1)';
         this.ctx.lineWidth = 1;
         for (let c = 1; c < this.grid.width; c++) {
             this.ctx.beginPath();
