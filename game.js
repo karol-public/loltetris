@@ -537,7 +537,7 @@ class Game {
         const maxBlockHeight = Math.floor(availableHeight / this.grid.height);
         const maxBlockWidth = Math.floor(availableWidth / this.grid.width);
 
-        this.blockSize = Math.max(12, Math.min(30, maxBlockHeight, maxBlockWidth));
+        this.blockSize = Math.max(12, Math.min(50, maxBlockHeight, maxBlockWidth));
 
         if (this.canvas) {
             this.canvas.width = this.grid.width * this.blockSize;

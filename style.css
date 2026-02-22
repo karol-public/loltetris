@@ -324,12 +324,19 @@ canvas#game-canvas.shake {
         padding: 4px 8px;
         min-width: 0;
         gap: 5px;
-        background: rgba(255, 255, 255, 0.85);
-        border-bottom: 2px dashed var(--accent-color);
+        background: rgba(255, 255, 255, 0.7);
     }
 
-    /* Hide these on mobile */
-    h1 { display: none; }
+    /* Title inline in header */
+    h1 {
+        display: inline;
+        font-size: 0.7rem;
+        margin: 0;
+        transform: none;
+        text-shadow: 1px 1px 0px #fbcfe8;
+        white-space: nowrap;
+        line-height: 1;
+    }
     .high-score-board { display: none; }
     .controls-info { display: none; }
 
