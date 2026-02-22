@@ -21,10 +21,27 @@
                     <div class="score-label">LEVEL</div>
                     <div id="level">1</div>
                 </div>
+                <div class="score-board high-score-board">
+                    <div class="score-label">BEST</div>
+                    <div id="high-score">0</div>
+                </div>
+                <div class="preview-section">
+                    <div class="preview-box">
+                        <div class="score-label">NEXT</div>
+                        <canvas id="preview-canvas" width="100" height="100"></canvas>
+                    </div>
+                    <div class="preview-box">
+                        <div class="score-label">HOLD</div>
+                        <canvas id="hold-canvas" width="100" height="100"></canvas>
+                    </div>
+                </div>
                 <div class="controls-info">
                     <p><span>←</span> <span>→</span> Move</p>
                     <p><span>↑</span> Rotate</p>
-                    <p><span>↓</span> Drop</p>
+                    <p><span>↓</span> Soft drop</p>
+                    <p><span>Space</span> Hard drop</p>
+                    <p><span>C</span> Hold</p>
+                    <p><span>Esc</span> Pause</p>
                 </div>
                 <button id="action-btn">I CAN HAS GAME?</button>
             </div>
@@ -38,11 +55,28 @@
             <div id="game-over-overlay" class="overlay hidden">
                 <h2>OH NOES!</h2>
                 <p>Score: <span id="final-score">0</span></p>
+                <p class="high-score-line">Best: <span id="high-score-overlay">0</span></p>
                 <button id="restart-btn">PLZ PLAY AGAIN?</button>
             </div>
             <div id="pause-overlay" class="overlay hidden">
                 <h2>PAUSED</h2>
                 <button id="resume-btn">RESUME PLZ</button>
+            </div>
+        </div>
+
+        <!-- Touch Controls -->
+        <div id="touch-controls">
+            <div class="touch-row touch-row-top">
+                <button id="touch-rotate" class="touch-btn" aria-label="Rotate">&#x21BB;</button>
+            </div>
+            <div class="touch-row touch-row-mid">
+                <button id="touch-left" class="touch-btn" aria-label="Move Left">&#x25C0;</button>
+                <button id="touch-hold" class="touch-btn touch-btn-small" aria-label="Hold">H</button>
+                <button id="touch-right" class="touch-btn" aria-label="Move Right">&#x25B6;</button>
+            </div>
+            <div class="touch-row touch-row-bottom">
+                <button id="touch-down" class="touch-btn" aria-label="Soft Drop">&#x25BC;</button>
+                <button id="touch-drop" class="touch-btn touch-btn-wide" aria-label="Hard Drop">DROP</button>
             </div>
         </div>
     </div>

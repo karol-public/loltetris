@@ -1,9 +1,7 @@
 :root {
     --bg-color: #fdf2f8;
-    /* Pinkish white */
     --grid-color: #1e293b;
     --accent-color: #db2777;
-    /* Pink */
     --text-color: #1f2937;
     --glass-bg: rgba(255, 255, 255, 0.8);
     --glass-border: rgba(219, 39, 119, 0.3);
@@ -71,6 +69,14 @@ h1 {
     text-align: center;
 }
 
+.high-score-board {
+    border-color: #facc15;
+}
+
+.high-score-board .score-label {
+    color: #ca8a04;
+}
+
 .score-label {
     font-size: 1rem;
     color: #db2777;
@@ -80,10 +86,36 @@ h1 {
 }
 
 #score,
-#level {
+#level,
+#high-score {
     font-size: 2rem;
     font-weight: 700;
     color: #1f2937;
+}
+
+/* Preview / Hold */
+.preview-section {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.preview-box {
+    flex: 1;
+    background: #fff;
+    padding: 0.5rem;
+    border-radius: 1rem;
+    border: 2px solid var(--accent-color);
+    text-align: center;
+}
+
+.preview-box canvas {
+    display: block;
+    margin: 0.25rem auto 0;
+    background: var(--grid-color);
+    border-radius: 4px;
+    border: 2px solid #1f2937;
+    width: 80px;
+    height: 80px;
 }
 
 .controls-info {
@@ -107,8 +139,9 @@ h1 {
     display: inline-flex;
     justify-content: center;
     align-items: center;
-    width: 24px;
+    min-width: 24px;
     height: 24px;
+    padding: 0 4px;
     background: #f3f4f6;
     border: 1px solid #d1d5db;
     border-radius: 4px;
@@ -140,7 +173,7 @@ button:active {
     margin-top: 4px;
 }
 
-canvas {
+canvas#game-canvas {
     background-color: var(--grid-color);
     border-radius: 4px;
     border: 4px solid #1f2937;
@@ -179,7 +212,10 @@ canvas {
     font-weight: bold;
 }
 
-/* Check overlap, maybe adjust font sizes if needed */
+.high-score-line {
+    font-size: 1.1rem !important;
+    color: #ca8a04;
+}
 
 /* Reward Cat Popup */
 #reward-container {
@@ -189,14 +225,11 @@ canvas {
     width: 100%;
     height: 100%;
     display: flex;
-    /* Use flex to center */
     justify-content: center;
     align-items: center;
     background: rgba(0, 0, 0, 0.5);
-    /* Dim background */
     opacity: 0;
     pointer-events: none;
-    /* Initially none */
     transition: opacity 0.3s;
     z-index: 20;
 }
@@ -204,9 +237,7 @@ canvas {
 #reward-container.show {
     opacity: 1;
     pointer-events: auto;
-    /* Enable clicking */
     transform: none;
-    /* Reset distinct transform if used before, moving to simple opacity fade for full screen overlay */
 }
 
 #reward-image {
@@ -231,28 +262,57 @@ canvas {
     margin-top: 0.5rem;
     order: 20;
     min-height: 44px;
-    /* Touch target size */
 }
 
+/* Screen shake animation */
+@keyframes shake {
+    0%, 100% { transform: translate(0, 0); }
+    10% { transform: translate(-4px, 2px); }
+    20% { transform: translate(4px, -2px); }
+    30% { transform: translate(-3px, -3px); }
+    40% { transform: translate(3px, 3px); }
+    50% { transform: translate(-2px, 1px); }
+    60% { transform: translate(2px, -1px); }
+    70% { transform: translate(-3px, 2px); }
+    80% { transform: translate(3px, -2px); }
+    90% { transform: translate(-1px, 1px); }
+}
+
+canvas#game-canvas.shake {
+    animation: shake 0.3s ease-in-out;
+}
+
+/* Touch Controls - hidden on desktop */
+#touch-controls {
+    display: none;
+}
+
+/* Mobile */
 @media (max-width: 768px),
 (hover: none) and (pointer: coarse) {
     body {
         padding: 0;
         align-items: flex-start;
-        /* To allow scrolling if needed, but we want full screen usually */
+    }
+
+    #app {
+        padding: 0;
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
     }
 
     .game-container {
         flex-direction: column;
         padding: 0.5rem;
-        width: 100vw;
-        height: 100vh;
+        width: 100%;
+        flex: 1;
         border: none;
         border-radius: 0;
         box-shadow: none;
         gap: 0.5rem;
         background: transparent;
-        /* Let body bg show through or simpler bg */
     }
 
     .game-info {
@@ -288,7 +348,8 @@ canvas {
     }
 
     #score,
-    #level {
+    #level,
+    #high-score {
         font-size: 1rem;
         line-height: 1;
     }
@@ -297,7 +358,24 @@ canvas {
         display: none;
     }
 
-    /* Hide the button labels if they take too much space, or keep them small */
+    .preview-section {
+        gap: 0.25rem;
+    }
+
+    .preview-box {
+        padding: 0.25rem;
+        border-radius: 0.5rem;
+    }
+
+    .preview-box .score-label {
+        font-size: 0.5rem;
+    }
+
+    .preview-box canvas {
+        width: 40px;
+        height: 40px;
+        border-width: 1px;
+    }
 
     #action-btn {
         display: block;
@@ -310,9 +388,111 @@ canvas {
         flex-shrink: 0;
     }
 
-    canvas {
+    canvas#game-canvas {
         display: block;
         margin: 0 auto;
-        /* Width/Height controlled by JS resize */
+    }
+
+    /* Show touch controls on mobile */
+    #touch-controls {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px 16px;
+        flex-shrink: 0;
+    }
+
+    .touch-row {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .touch-btn {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        font-size: 1.5rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 0;
+        border-bottom-width: 3px;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+        touch-action: manipulation;
+    }
+
+    .touch-btn-small {
+        width: 48px;
+        height: 48px;
+        font-size: 1rem;
+    }
+
+    .touch-btn-wide {
+        width: auto;
+        border-radius: 2rem;
+        padding: 0 1.5rem;
+        font-size: 1rem;
+    }
+}
+
+/* Landscape mobile */
+@media (max-height: 500px) and (orientation: landscape) {
+    #app {
+        flex-direction: row;
+        height: 100vh;
+    }
+
+    .game-container {
+        flex-direction: row;
+        flex: 1;
+        height: 100%;
+    }
+
+    .game-info {
+        flex-direction: column;
+        min-width: 100px;
+        gap: 0.5rem;
+    }
+
+    h1 {
+        font-size: 0.9rem;
+    }
+
+    .preview-section {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .preview-box canvas {
+        width: 36px;
+        height: 36px;
+    }
+
+    #touch-controls {
+        flex-direction: column;
+        padding: 8px;
+        justify-content: center;
+        height: 100%;
+    }
+
+    .touch-btn {
+        width: 48px;
+        height: 48px;
+        font-size: 1.2rem;
+    }
+
+    .touch-btn-small {
+        width: 40px;
+        height: 40px;
+        font-size: 0.9rem;
+    }
+
+    .touch-btn-wide {
+        padding: 0 1rem;
+        font-size: 0.9rem;
     }
 }

@@ -1,7 +1,7 @@
 // SHAPES and Tetromino
 const SHAPES = {
     I: {
-        color: '#38bdf8', // Cyan
+        color: '#38bdf8',
         matrix: [
             [0, 0, 0, 0],
             [1, 1, 1, 1],
@@ -10,7 +10,7 @@ const SHAPES = {
         ]
     },
     J: {
-        color: '#818cf8', // Indigo
+        color: '#818cf8',
         matrix: [
             [1, 0, 0],
             [1, 1, 1],
@@ -18,7 +18,7 @@ const SHAPES = {
         ]
     },
     L: {
-        color: '#fb923c', // Orange
+        color: '#fb923c',
         matrix: [
             [0, 0, 1],
             [1, 1, 1],
@@ -26,14 +26,14 @@ const SHAPES = {
         ]
     },
     O: {
-        color: '#facc15', // Yellow
+        color: '#facc15',
         matrix: [
             [1, 1],
             [1, 1]
         ]
     },
     S: {
-        color: '#4ade80', // Green
+        color: '#4ade80',
         matrix: [
             [0, 1, 1],
             [1, 1, 0],
@@ -41,7 +41,7 @@ const SHAPES = {
         ]
     },
     T: {
-        color: '#c084fc', // Purple
+        color: '#c084fc',
         matrix: [
             [0, 1, 0],
             [1, 1, 1],
@@ -49,7 +49,7 @@ const SHAPES = {
         ]
     },
     Z: {
-        color: '#f87171', // Red
+        color: '#f87171',
         matrix: [
             [1, 1, 0],
             [0, 1, 1],
@@ -76,7 +76,6 @@ class Tetromino {
         this.matrix = rotated;
     }
 
-    // Clone for collision testing
     clone() {
         const clone = new Tetromino(this.shapeKey);
         clone.matrix = this.matrix.map(row => [...row]);
@@ -106,13 +105,9 @@ class Grid {
                 if (tetromino.matrix[r][c]) {
                     const x = tetromino.x + c;
                     const y = tetromino.y + r;
-
-                    // Check bounds
                     if (x < 0 || x >= this.width || y >= this.height) {
                         return false;
                     }
-
-                    // Check collision with locked pieces
                     if (y >= 0 && this.grid[y][x]) {
                         return false;
                     }
@@ -128,7 +123,6 @@ class Grid {
                 if (tetromino.matrix[r][c]) {
                     const x = tetromino.x + c;
                     const y = tetromino.y + r;
-                    // Only lock if within bounds (ignore top out for now, handled by game over)
                     if (y >= 0 && y < this.height) {
                         this.grid[y][x] = tetromino.color;
                     }
@@ -137,17 +131,23 @@ class Grid {
         }
     }
 
-    clearLines() {
-        let linesCleared = 0;
+    findFullLines() {
+        const fullLines = [];
         for (let r = this.height - 1; r >= 0; r--) {
             if (this.grid[r].every(cell => cell !== null)) {
-                this.grid.splice(r, 1);
-                this.grid.unshift(Array(this.width).fill(null));
-                linesCleared++;
-                r++; // Check the same row index again as rows shifted down
+                fullLines.push(r);
             }
         }
-        return linesCleared;
+        return fullLines;
+    }
+
+    removeLines(lines) {
+        lines.sort((a, b) => b - a);
+        for (const r of lines) {
+            this.grid.splice(r, 1);
+            this.grid.unshift(Array(this.width).fill(null));
+        }
+        return lines.length;
     }
 
     reset() {
@@ -170,21 +170,47 @@ class Renderer {
         this.canvas.height = this.grid.height * this.blockSize;
     }
 
-    draw(activeTetromino) {
+    draw(activeTetromino, flashingRows = [], flashOn = false, dropTrails = [], particles = []) {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        this.drawGrid();
+        this.drawGridLines();
+        this.drawGrid(flashingRows, flashOn);
+        this.drawDropTrails(dropTrails);
+
         if (activeTetromino) {
-            this.drawTetromino(activeTetromino);
             this.drawGhost(activeTetromino);
+            this.drawTetromino(activeTetromino);
+        }
+
+        this.drawParticles(particles);
+    }
+
+    drawGridLines() {
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+        this.ctx.lineWidth = 1;
+        for (let c = 1; c < this.grid.width; c++) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(c * this.blockSize + 0.5, 0);
+            this.ctx.lineTo(c * this.blockSize + 0.5, this.canvas.height);
+            this.ctx.stroke();
+        }
+        for (let r = 1; r < this.grid.height; r++) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, r * this.blockSize + 0.5);
+            this.ctx.lineTo(this.canvas.width, r * this.blockSize + 0.5);
+            this.ctx.stroke();
         }
     }
 
-    drawGrid() {
+    drawGrid(flashingRows = [], flashOn = false) {
         for (let r = 0; r < this.grid.height; r++) {
             for (let c = 0; c < this.grid.width; c++) {
                 if (this.grid.grid[r][c]) {
-                    this.drawBlock(c, r, this.grid.grid[r][c]);
+                    if (flashingRows.includes(r) && flashOn) {
+                        this.drawBlock(c, r, '#ffffff');
+                    } else {
+                        this.drawBlock(c, r, this.grid.grid[r][c]);
+                    }
                 }
             }
         }
@@ -205,7 +231,7 @@ class Renderer {
         while (this.grid.isValidPosition(ghost)) {
             ghost.y++;
         }
-        ghost.y--; // Step back to valid position
+        ghost.y--;
 
         this.ctx.globalAlpha = 0.2;
         this.drawTetromino(ghost);
@@ -213,31 +239,136 @@ class Renderer {
     }
 
     drawBlock(x, y, color) {
+        const bs = this.blockSize;
+        const gap = 1;
+        const radius = Math.min(4, bs * 0.15);
+        const px = x * bs + gap;
+        const py = y * bs + gap;
+        const size = bs - gap * 2;
+
         this.ctx.fillStyle = color;
-        this.ctx.fillRect(x * this.blockSize, y * this.blockSize, this.blockSize, this.blockSize);
+        this.ctx.beginPath();
+        this.ctx.roundRect(px, py, size, size, radius);
+        this.ctx.fill();
 
-        // Add inner shadow/highlight for 3D effect
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-        this.ctx.fillRect(x * this.blockSize, y * this.blockSize, this.blockSize, 2);
-        this.ctx.fillRect(x * this.blockSize, y * this.blockSize, 2, this.blockSize);
+        // Highlight top
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        this.ctx.fillRect(px + 2, py + 2, size - 4, Math.max(2, size * 0.15));
 
+        // Shadow bottom-right
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-        this.ctx.fillRect((x + 1) * this.blockSize - 2, y * this.blockSize, 2, this.blockSize);
-        this.ctx.fillRect(x * this.blockSize, (y + 1) * this.blockSize - 2, this.blockSize, 2);
+        this.ctx.fillRect(px + size - 2, py + 2, 2, size - 4);
+        this.ctx.fillRect(px + 2, py + size - 2, size - 4, 2);
     }
+
+    drawPreview(canvas, tetromino) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!tetromino) return;
+
+        const matSize = tetromino.matrix.length;
+        const previewBlockSize = Math.floor(Math.min(canvas.width, canvas.height) / (matSize + 0.5));
+        const offsetX = (canvas.width - matSize * previewBlockSize) / 2;
+        const offsetY = (canvas.height - matSize * previewBlockSize) / 2;
+
+        for (let r = 0; r < matSize; r++) {
+            for (let c = 0; c < matSize; c++) {
+                if (tetromino.matrix[r][c]) {
+                    const gap = 1;
+                    const radius = Math.min(4, previewBlockSize * 0.15);
+                    const px = offsetX + c * previewBlockSize + gap;
+                    const py = offsetY + r * previewBlockSize + gap;
+                    const size = previewBlockSize - gap * 2;
+
+                    ctx.fillStyle = tetromino.color;
+                    ctx.beginPath();
+                    ctx.roundRect(px, py, size, size, radius);
+                    ctx.fill();
+
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+                    ctx.fillRect(px + 2, py + 2, size - 4, Math.max(2, size * 0.15));
+                }
+            }
+        }
+    }
+
+    drawDropTrails(trails) {
+        for (const trail of trails) {
+            const alpha = (trail.timer / trail.maxTimer) * 0.4;
+            this.ctx.globalAlpha = alpha;
+            this.ctx.fillStyle = trail.color;
+            const bs = this.blockSize;
+            for (let y = trail.startY; y < trail.endY; y++) {
+                this.ctx.fillRect(trail.x * bs + 2, y * bs, bs - 4, bs);
+            }
+            this.ctx.globalAlpha = 1.0;
+        }
+    }
+
+    drawParticles(particles) {
+        for (const p of particles) {
+            this.ctx.globalAlpha = p.life;
+            this.ctx.fillStyle = p.color;
+            this.ctx.fillRect(p.x, p.y, p.size, p.size);
+        }
+        this.ctx.globalAlpha = 1.0;
+    }
+}
+
+// Particle
+class Particle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.vx = (Math.random() - 0.5) * 8;
+        this.vy = (Math.random() - 1) * 6;
+        this.life = 1.0;
+        this.decay = 0.02 + Math.random() * 0.02;
+        this.size = 3 + Math.random() * 4;
+    }
+
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += 0.15;
+        this.life -= this.decay;
+    }
+
+    get alive() {
+        return this.life > 0;
+    }
+}
+
+// Haptic feedback helper
+function vibrate(pattern) {
+    if (navigator.vibrate) navigator.vibrate(pattern);
 }
 
 // Input
 class Input {
     constructor(game) {
         this.game = game;
+        this.lastSwipeTime = 0;
         this.setupListeners();
         this.setupSwipeControls();
+        this.setupTouchButtons();
     }
 
     setupListeners() {
         document.addEventListener('keydown', (event) => {
-            if (this.game.isGameOver) return;
+            // Prevent arrow key / space page scrolling
+            if (['ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', 'Space'].includes(event.code)) {
+                event.preventDefault();
+            }
+
+            // Escape toggles pause anytime
+            if (event.code === 'Escape') {
+                this.game.togglePause();
+                return;
+            }
+
+            if (this.game.isGameOver || !this.game.isRunning || this.game.isPaused) return;
 
             switch (event.code) {
                 case 'ArrowLeft':
@@ -255,16 +386,11 @@ class Input {
                 case 'Space':
                     this.game.hardDrop();
                     break;
+                case 'KeyC':
+                    this.game.hold();
+                    break;
             }
         });
-
-        const startBtn = document.getElementById('start-btn');
-        if (startBtn) {
-            startBtn.addEventListener('click', () => {
-                this.game.start();
-                startBtn.blur(); // Remove focus so spacebar doesn't trigger click
-            });
-        }
     }
 
     setupSwipeControls() {
@@ -272,56 +398,70 @@ class Input {
         let touchStartY = 0;
         let touchEndX = 0;
         let touchEndY = 0;
-
-        const minSwipeDistance = 30; // Minimum distance for a swipe
+        const minSwipeDistance = 30;
 
         const handleGesture = () => {
+            const now = Date.now();
+            if (now - this.lastSwipeTime < 150) return;
+            this.lastSwipeTime = now;
+
             const deltaX = touchEndX - touchStartX;
             const deltaY = touchEndY - touchStartY;
 
             if (Math.abs(deltaX) > Math.abs(deltaY)) {
-                // Horizontal Swipe
                 if (Math.abs(deltaX) > minSwipeDistance) {
-                    if (deltaX > 0) {
-                        // Right
-                        this.game.move(1);
-                    } else {
-                        // Left
-                        this.game.move(-1);
-                    }
+                    if (deltaX > 0) this.game.move(1);
+                    else this.game.move(-1);
                 }
             } else {
-                // Vertical Swipe
                 if (Math.abs(deltaY) > minSwipeDistance) {
-                    if (deltaY > 0) {
-                        // Down - Hard Drop (instant bottom)
-                        this.game.hardDrop();
-                    } else {
-                        // Up - Rotate
-                        this.game.rotate();
-                    }
+                    if (deltaY > 0) this.game.hardDrop();
+                    else this.game.rotate();
                 }
             }
         };
 
         const preventDefault = (e) => {
-            if (e.target.id !== 'action-btn' && e.target.id !== 'restart-btn' && e.target.id !== 'resume-btn' && e.target.closest('#reward-container')) {
+            if (e.target.id !== 'action-btn' && e.target.id !== 'restart-btn' &&
+                e.target.id !== 'resume-btn' && !e.target.closest('#reward-container') &&
+                !e.target.closest('#touch-controls')) {
                 e.preventDefault();
             }
         };
 
         document.addEventListener('touchstart', (e) => {
             preventDefault(e);
-            touchStartX = e.changedTouches[0].screenX;
-            touchStartY = e.changedTouches[0].screenY;
+            touchStartX = e.changedTouches[0].clientX;
+            touchStartY = e.changedTouches[0].clientY;
         }, { passive: false });
 
         document.addEventListener('touchend', (e) => {
             preventDefault(e);
-            touchEndX = e.changedTouches[0].screenX;
-            touchEndY = e.changedTouches[0].screenY;
+            touchEndX = e.changedTouches[0].clientX;
+            touchEndY = e.changedTouches[0].clientY;
             handleGesture();
         }, { passive: false });
+    }
+
+    setupTouchButtons() {
+        const buttons = {
+            'touch-left': () => this.game.move(-1),
+            'touch-right': () => this.game.move(1),
+            'touch-rotate': () => this.game.rotate(),
+            'touch-drop': () => this.game.hardDrop(),
+            'touch-down': () => this.game.drop(),
+            'touch-hold': () => this.game.hold()
+        };
+
+        for (const [id, action] of Object.entries(buttons)) {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    action();
+                }, { passive: false });
+            }
+        }
     }
 }
 
@@ -331,15 +471,17 @@ class Game {
         this.canvas = document.getElementById('game-canvas');
         this.grid = new Grid(10, 20);
 
-        // Initial Resize to set dimensions before Renderer init
         this.resize();
 
         this.renderer = new Renderer(this.canvas, this.grid, this.blockSize);
         this.input = new Input(this);
 
+        // UI elements
         this.scoreElement = document.getElementById('score');
         this.levelElement = document.getElementById('level');
         this.finalScoreElement = document.getElementById('final-score');
+        this.highScoreElement = document.getElementById('high-score');
+        this.highScoreOverlayElement = document.getElementById('high-score-overlay');
 
         this.gameOverOverlay = document.getElementById('game-over-overlay');
         this.pauseOverlay = document.getElementById('pause-overlay');
@@ -347,47 +489,68 @@ class Game {
         this.restartBtn = document.getElementById('restart-btn');
         this.resumeBtn = document.getElementById('resume-btn');
 
-        // Reward element
         this.rewardContainer = document.getElementById('reward-container');
+        this.previewCanvas = document.getElementById('preview-canvas');
+        this.holdCanvas = document.getElementById('hold-canvas');
 
+        // Game state
         this.score = 0;
         this.level = 1;
         this.lines = 0;
+        this.highScore = parseInt(localStorage.getItem('loltetris-highscore')) || 0;
 
         this.activeTetromino = null;
+        this.nextTetromino = null;
+        this.holdTetromino = null;
+        this.canHold = true;
+        this.combo = 0;
+
         this.isGameOver = false;
         this.isRunning = false;
         this.isPaused = false;
-        this.isRewardActive = false; // New state for reward pause
+        this.isRewardActive = false;
 
         this.lastTime = 0;
         this.dropCounter = 0;
         this.dropInterval = 1000;
 
+        // Lock delay
+        this.lockTimer = 500;
+        this.lockDelay = 500;
+
+        // Clear animation
+        this.isClearAnimating = false;
+        this.clearingLines = [];
+        this.clearAnimTimer = 0;
+        this.clearAnimDuration = 400;
+
+        // Particles & trails
+        this.particles = [];
+        this.maxParticles = 200;
+        this.dropTrails = [];
+
         this.loop = this.loop.bind(this);
         this.setupUIListeners();
+        this.updateHighScoreDisplay();
 
-        // Window Resize Listener
         window.addEventListener('resize', () => {
             this.resize();
-            // Update renderer's block size and canvas size
             this.renderer.updateSize(this.blockSize);
             this.renderer.draw(this.activeTetromino);
         });
     }
 
     resize() {
-        const padding = 40; // Space for headers/score
-        const availableHeight = window.innerHeight - document.querySelector('.game-info').offsetHeight - padding;
+        const padding = 40;
+        const gameInfo = document.querySelector('.game-info');
+        const availableHeight = window.innerHeight - (gameInfo ? gameInfo.offsetHeight : 0) - padding;
         const availableWidth = window.innerWidth - padding;
 
         const maxBlockHeight = Math.floor(availableHeight / this.grid.height);
         const maxBlockWidth = Math.floor(availableWidth / this.grid.width);
 
-        // Use the smaller dimension to fit within screen
         this.blockSize = Math.max(15, Math.min(30, maxBlockHeight, maxBlockWidth));
 
-        // Update canvas dimensions
         if (this.canvas) {
             this.canvas.width = this.grid.width * this.blockSize;
             this.canvas.height = this.grid.height * this.blockSize;
@@ -400,17 +563,13 @@ class Game {
             this.start();
         });
 
-        // Combined Action Button Logic
         this.actionBtn.addEventListener('click', () => {
             if (!this.isRunning && !this.isGameOver) {
-                // Initial Start
                 this.start();
             } else if (this.isGameOver) {
-                // Restart
                 this.gameOverOverlay.classList.add('hidden');
                 this.start();
             } else {
-                // Toggle Pause
                 this.togglePause();
             }
             this.actionBtn.blur();
@@ -418,16 +577,14 @@ class Game {
 
         this.resumeBtn.addEventListener('click', () => this.togglePause());
 
-        // Reward Dismissal
+        // Reward dismissal
         const dismissReward = (e) => {
-            if (e.type === 'touchstart') e.preventDefault(); // Prevent ghost clicks
+            if (e.type === 'touchstart') e.preventDefault();
             if (this.isRewardActive) {
                 this.isRewardActive = false;
                 this.isPaused = false;
                 this.rewardContainer.classList.remove('show');
                 this.updateActionButton();
-
-                // Resume loop
                 this.lastTime = performance.now();
                 requestAnimationFrame(this.loop);
             }
@@ -436,7 +593,6 @@ class Game {
         this.rewardContainer.addEventListener('click', dismissReward);
         this.rewardContainer.addEventListener('touchstart', dismissReward, { passive: false });
 
-        // Handle visibility change to auto-pause
         document.addEventListener('visibilitychange', () => {
             if (document.hidden && this.isRunning && !this.isPaused && !this.isRewardActive) {
                 this.togglePause();
@@ -451,14 +607,27 @@ class Game {
         this.score = 0;
         this.level = 1;
         this.lines = 0;
-        this.updateScore();
+        this.combo = 0;
+        this.updateScoreDisplay();
 
         this.isGameOver = false;
         this.isRunning = true;
         this.isPaused = false;
         this.isRewardActive = false;
+        this.isClearAnimating = false;
+        this.holdTetromino = null;
+        this.canHold = true;
+        this.particles = [];
+        this.dropTrails = [];
         this.updateActionButton();
 
+        // Clear hold canvas
+        if (this.holdCanvas) {
+            this.renderer.drawPreview(this.holdCanvas, null);
+        }
+
+        // Generate first next piece and spawn
+        this.nextTetromino = getRandomTetromino();
         this.spawnTetromino();
 
         this.lastTime = 0;
@@ -494,9 +663,18 @@ class Game {
     }
 
     spawnTetromino() {
-        this.activeTetromino = getRandomTetromino();
+        this.activeTetromino = this.nextTetromino;
+        this.nextTetromino = getRandomTetromino();
+
         this.activeTetromino.x = Math.floor(this.grid.width / 2) - Math.floor(this.activeTetromino.matrix[0].length / 2);
         this.activeTetromino.y = 0;
+        this.lockTimer = this.lockDelay;
+        this.canHold = true;
+
+        // Update preview
+        if (this.previewCanvas) {
+            this.renderer.drawPreview(this.previewCanvas, this.nextTetromino);
+        }
 
         if (!this.grid.isValidPosition(this.activeTetromino)) {
             this.gameOver();
@@ -504,128 +682,261 @@ class Game {
     }
 
     move(dir) {
-        if (!this.isRunning || this.isPaused) return;
+        if (!this.isRunning || this.isPaused || this.isClearAnimating) return;
 
         this.activeTetromino.x += dir;
         if (!this.grid.isValidPosition(this.activeTetromino)) {
             this.activeTetromino.x -= dir;
+        } else {
+            this.lockTimer = this.lockDelay;
+            vibrate(10);
         }
     }
 
     rotate() {
-        if (!this.isRunning || this.isPaused) return;
+        if (!this.isRunning || this.isPaused || this.isClearAnimating) return;
 
         const originalMatrix = this.activeTetromino.matrix;
         this.activeTetromino.rotate();
 
-        // Wall kick (basic)
         if (!this.grid.isValidPosition(this.activeTetromino)) {
-            // Try moving left
             this.activeTetromino.x -= 1;
             if (!this.grid.isValidPosition(this.activeTetromino)) {
-                // Try moving right
                 this.activeTetromino.x += 2;
                 if (!this.grid.isValidPosition(this.activeTetromino)) {
-                    // Revert
                     this.activeTetromino.x -= 1;
                     this.activeTetromino.matrix = originalMatrix;
+                    return;
                 }
             }
         }
+        this.lockTimer = this.lockDelay;
     }
 
     drop() {
-        if (!this.isRunning || this.isPaused) return;
+        if (!this.isRunning || this.isPaused || this.isClearAnimating) return;
 
         this.activeTetromino.y++;
         if (!this.grid.isValidPosition(this.activeTetromino)) {
             this.activeTetromino.y--;
-            this.lock();
-            this.dropCounter = 0; // Reset drop counter
+            // Lock delay handles locking, not here
         }
+        this.dropCounter = 0;
     }
 
     hardDrop() {
-        if (!this.isRunning || this.isPaused) return;
+        if (!this.isRunning || this.isPaused || this.isClearAnimating) return;
+
+        const startY = this.activeTetromino.y;
         while (this.grid.isValidPosition(this.activeTetromino)) {
             this.activeTetromino.y++;
         }
         this.activeTetromino.y--;
-        this.lock();
+
+        // Create drop trail
+        const endY = this.activeTetromino.y;
+        if (endY > startY) {
+            for (let r = 0; r < this.activeTetromino.matrix.length; r++) {
+                for (let c = 0; c < this.activeTetromino.matrix[r].length; c++) {
+                    if (this.activeTetromino.matrix[r][c]) {
+                        this.dropTrails.push({
+                            x: this.activeTetromino.x + c,
+                            startY: startY + r,
+                            endY: endY + r,
+                            color: this.activeTetromino.color,
+                            timer: 200,
+                            maxTimer: 200
+                        });
+                    }
+                }
+            }
+        }
+
+        vibrate(30);
+        this.lock(); // Hard drop bypasses lock delay
         this.dropCounter = 0;
+    }
+
+    hold() {
+        if (!this.isRunning || this.isPaused || !this.canHold || this.isClearAnimating) return;
+
+        this.canHold = false;
+        const currentKey = this.activeTetromino.shapeKey;
+
+        if (this.holdTetromino) {
+            // Swap with hold
+            this.activeTetromino = new Tetromino(this.holdTetromino.shapeKey);
+            this.activeTetromino.x = Math.floor(this.grid.width / 2) - Math.floor(this.activeTetromino.matrix[0].length / 2);
+            this.activeTetromino.y = 0;
+        } else {
+            // No hold piece yet, take from next
+            this.activeTetromino = this.nextTetromino;
+            this.nextTetromino = getRandomTetromino();
+            this.activeTetromino.x = Math.floor(this.grid.width / 2) - Math.floor(this.activeTetromino.matrix[0].length / 2);
+            this.activeTetromino.y = 0;
+            if (this.previewCanvas) {
+                this.renderer.drawPreview(this.previewCanvas, this.nextTetromino);
+            }
+        }
+
+        this.holdTetromino = new Tetromino(currentKey);
+        this.lockTimer = this.lockDelay;
+
+        if (this.holdCanvas) {
+            this.renderer.drawPreview(this.holdCanvas, this.holdTetromino);
+        }
+
+        if (!this.grid.isValidPosition(this.activeTetromino)) {
+            this.gameOver();
+        }
     }
 
     lock() {
         this.grid.lockTetromino(this.activeTetromino);
-        const cleared = this.grid.clearLines();
-        if (cleared > 0) {
-            this.updateScore(cleared);
+        vibrate(30);
+
+        const fullLines = this.grid.findFullLines();
+
+        if (fullLines.length > 0) {
+            // Start clear animation
+            this.isClearAnimating = true;
+            this.clearingLines = fullLines;
+            this.clearAnimTimer = this.clearAnimDuration;
+            this.activeTetromino = null; // Don't draw locked piece twice
+
+            this.spawnClearParticles(fullLines);
+
+            // Screen shake for Tetris (4 lines)
+            if (fullLines.length === 4) {
+                this.canvas.classList.add('shake');
+                setTimeout(() => this.canvas.classList.remove('shake'), 300);
+            }
+        } else {
+            // No lines cleared - reset combo
+            this.combo = 0;
+            this.spawnTetromino();
         }
+    }
+
+    finishClearAnimation() {
+        this.isClearAnimating = false;
+        const cleared = this.grid.removeLines(this.clearingLines);
+        this.clearingLines = [];
+
+        this.combo++;
+        this.updateScore(cleared);
+
         this.spawnTetromino();
+    }
+
+    spawnClearParticles(rows) {
+        for (const r of rows) {
+            for (let c = 0; c < this.grid.width; c++) {
+                const color = this.grid.grid[r][c] || '#ffffff';
+                const baseX = c * this.blockSize + this.blockSize / 2;
+                const baseY = r * this.blockSize + this.blockSize / 2;
+                const perCell = Math.ceil(30 / this.grid.width);
+                for (let i = 0; i < perCell; i++) {
+                    if (this.particles.length >= this.maxParticles) return;
+                    this.particles.push(new Particle(baseX, baseY, color));
+                }
+            }
+        }
     }
 
     updateScore(linesCleared = 0) {
         if (linesCleared > 0) {
             const points = [0, 40, 100, 300, 1200];
             this.score += points[linesCleared] * this.level;
+
+            // Combo bonus
+            if (this.combo > 1) {
+                this.score += 50 * this.combo * this.level;
+            }
+
             this.lines += linesCleared;
             this.level = Math.floor(this.lines / 10) + 1;
-
-            // Speed up
             this.dropInterval = Math.max(100, 1000 - (this.level - 1) * 100);
 
-            // Show Reward Cat
+            // Update high score
+            if (this.score > this.highScore) {
+                this.highScore = this.score;
+                localStorage.setItem('loltetris-highscore', this.highScore);
+            }
+
+            // Haptic
+            if (linesCleared === 4) {
+                vibrate([50, 30, 50, 30, 50]);
+            } else {
+                vibrate(50);
+            }
+
             this.showRewardCat(linesCleared);
         }
 
+        this.updateScoreDisplay();
+    }
+
+    updateScoreDisplay() {
         this.scoreElement.textContent = this.score;
         this.levelElement.textContent = this.level;
+        this.updateHighScoreDisplay();
+    }
+
+    updateHighScoreDisplay() {
+        if (this.highScoreElement) {
+            this.highScoreElement.textContent = this.highScore;
+        }
     }
 
     showRewardCat(lines) {
         const cats = [
-            'assets/cat1.jpg',
-            'assets/cat2.jpg',
-            'assets/cat3.jpg',
-            'assets/cat4.jpg',
-            'assets/cat5.jpg',
-            'assets/cat6.jpg',
-            'assets/cat7.jpg',
-            'assets/cat8.jpg'
+            'assets/cat1.jpg', 'assets/cat2.jpg', 'assets/cat3.jpg', 'assets/cat4.jpg',
+            'assets/cat5.jpg', 'assets/cat6.jpg', 'assets/cat7.jpg', 'assets/cat8.jpg'
         ];
 
-        // Pick random cat
-        const randomCat = cats[Math.floor(Math.random() * cats.length)];
-        const rewardContainer = document.getElementById('reward-container');
+        let src;
+        if (lines === 4) {
+            src = 'assets/lolcat_laser_eyes.svg';
+        } else if (lines >= 2) {
+            src = 'assets/lolcat_surprised_wow.svg';
+        } else {
+            src = Math.random() < 0.5
+                ? 'assets/lolcat_happy_burger.svg'
+                : cats[Math.floor(Math.random() * cats.length)];
+        }
+
         const rewardImage = document.getElementById('reward-image');
+        rewardImage.src = src;
+        this.rewardContainer.classList.add('show');
 
-        rewardImage.src = randomCat;
-        rewardContainer.classList.add('show');
-
-        // Pause game logic
         this.isPaused = true;
         this.isRewardActive = true;
         this.updateActionButton();
-
-        rewardImage.src = randomCat;
-        rewardContainer.classList.add('show');
-
-        // No timeout - wait for user click to dismiss in UI listener
     }
 
     gameOver() {
         this.isRunning = false;
         this.isGameOver = true;
         this.updateActionButton();
+        vibrate(200);
 
-        // Show grumpy cat on game over
-        const rewardContainer = document.getElementById('reward-container');
+        // Update high score
+        if (this.score > this.highScore) {
+            this.highScore = this.score;
+            localStorage.setItem('loltetris-highscore', this.highScore);
+        }
+
         const rewardImage = document.getElementById('reward-image');
         rewardImage.src = 'assets/lolcat_grumpy_no.svg';
-        rewardContainer.classList.add('show');
-        setTimeout(() => rewardContainer.classList.remove('show'), 3000);
+        this.rewardContainer.classList.add('show');
+        setTimeout(() => this.rewardContainer.classList.remove('show'), 3000);
 
         this.finalScoreElement.textContent = this.score;
+        if (this.highScoreOverlayElement) {
+            this.highScoreOverlayElement.textContent = this.highScore;
+        }
+        this.updateHighScoreDisplay();
         this.gameOverOverlay.classList.remove('hidden');
     }
 
@@ -635,18 +946,60 @@ class Game {
         const deltaTime = time - this.lastTime;
         this.lastTime = time;
 
+        // Update particles
+        this.particles = this.particles.filter(p => {
+            p.update();
+            return p.alive;
+        });
+
+        // Update drop trails
+        this.dropTrails = this.dropTrails.filter(t => {
+            t.timer -= deltaTime;
+            return t.timer > 0;
+        });
+
+        // Clear animation in progress
+        if (this.isClearAnimating) {
+            this.clearAnimTimer -= deltaTime;
+            if (this.clearAnimTimer <= 0) {
+                this.finishClearAnimation();
+                if (!this.isRunning) return; // Game over during spawn
+            } else {
+                const progress = 1 - (this.clearAnimTimer / this.clearAnimDuration);
+                const flashOn = Math.floor(progress * 6) % 2 === 0;
+                this.renderer.draw(this.activeTetromino, this.clearingLines, flashOn, this.dropTrails, this.particles);
+                requestAnimationFrame(this.loop);
+                return;
+            }
+        }
+
+        // Gravity
         this.dropCounter += deltaTime;
         if (this.dropCounter > this.dropInterval) {
             this.drop();
             this.dropCounter = 0;
         }
 
-        this.renderer.draw(this.activeTetromino);
+        // Lock delay
+        if (this.activeTetromino && !this.isClearAnimating) {
+            const test = this.activeTetromino.clone();
+            test.y++;
+            if (!this.grid.isValidPosition(test)) {
+                this.lockTimer -= deltaTime;
+                if (this.lockTimer <= 0) {
+                    this.lock();
+                    if (!this.isRunning) return; // Game over
+                }
+            } else {
+                this.lockTimer = this.lockDelay;
+            }
+        }
+
+        this.renderer.draw(this.activeTetromino, [], false, this.dropTrails, this.particles);
         requestAnimationFrame(this.loop);
     }
 }
 
 // Initialize Game
 const game = new Game();
-// Initial draw
 game.renderer.draw(null);
