@@ -170,7 +170,7 @@ class Renderer {
         this.canvas.height = this.grid.height * this.blockSize;
     }
 
-    draw(activeTetromino, flashingRows = [], flashOn = false, dropTrails = [], particles = []) {
+    draw(activeTetromino, flashingRows = [], flashOn = false, dropTrails = [], particles = [], scorePopups = []) {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
         this.drawGridLines();
@@ -183,6 +183,7 @@ class Renderer {
         }
 
         this.drawParticles(particles);
+        this.drawScorePopups(scorePopups);
     }
 
     drawGridLines() {
@@ -233,8 +234,27 @@ class Renderer {
         }
         ghost.y--;
 
-        this.ctx.globalAlpha = 0.2;
+        // Draw filled ghost at higher opacity
+        this.ctx.globalAlpha = 0.3;
         this.drawTetromino(ghost);
+        this.ctx.globalAlpha = 1.0;
+
+        // Draw dashed outline for extra visibility
+        const bs = this.blockSize;
+        this.ctx.strokeStyle = tetromino.color;
+        this.ctx.lineWidth = 1.5;
+        this.ctx.globalAlpha = 0.5;
+        this.ctx.setLineDash([3, 3]);
+        for (let r = 0; r < ghost.matrix.length; r++) {
+            for (let c = 0; c < ghost.matrix[r].length; c++) {
+                if (ghost.matrix[r][c]) {
+                    const px = (ghost.x + c) * bs + 1;
+                    const py = (ghost.y + r) * bs + 1;
+                    this.ctx.strokeRect(px, py, bs - 2, bs - 2);
+                }
+            }
+        }
+        this.ctx.setLineDash([]);
         this.ctx.globalAlpha = 1.0;
     }
 
@@ -261,7 +281,7 @@ class Renderer {
         this.ctx.fillRect(px + 2, py + size - 2, size - 4, 2);
     }
 
-    drawPreview(canvas, tetromino) {
+    drawPreview(canvas, tetromino, dimmed = false) {
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (!tetromino) return;
@@ -290,6 +310,11 @@ class Renderer {
                 }
             }
         }
+
+        if (dimmed) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
     }
 
     drawDropTrails(trails) {
@@ -313,6 +338,20 @@ class Renderer {
         }
         this.ctx.globalAlpha = 1.0;
     }
+
+    drawScorePopups(popups) {
+        for (const popup of popups) {
+            this.ctx.globalAlpha = popup.life;
+            this.ctx.fillStyle = popup.color;
+            this.ctx.font = 'bold 18px "Comic Sans MS", sans-serif';
+            this.ctx.textAlign = 'center';
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            this.ctx.lineWidth = 3;
+            this.ctx.strokeText(popup.text, popup.x, popup.y);
+            this.ctx.fillText(popup.text, popup.x, popup.y);
+        }
+        this.ctx.globalAlpha = 1.0;
+    }
 }
 
 // Particle
@@ -332,6 +371,28 @@ class Particle {
         this.x += this.vx;
         this.y += this.vy;
         this.vy += 0.15;
+        this.life -= this.decay;
+    }
+
+    get alive() {
+        return this.life > 0;
+    }
+}
+
+// Score popup (floating +points text)
+class ScorePopup {
+    constructor(text, x, y, color = '#db2777') {
+        this.text = text;
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.life = 1.0;
+        this.decay = 0.015;
+        this.vy = -1.5;
+    }
+
+    update() {
+        this.y += this.vy;
         this.life -= this.decay;
     }
 
@@ -397,7 +458,17 @@ class Input {
         let touchStartY = 0;
         let touchEndX = 0;
         let touchEndY = 0;
+        let touchStartTime = 0;
         const minSwipeDistance = 30;
+        const tapMaxDistance = 15;
+        const tapMaxDuration = 250;
+
+        const isButton = (e) => {
+            const t = e.target;
+            return t.id === 'action-btn' || t.id === 'restart-btn' ||
+                t.id === 'resume-btn' || t.closest('#reward-container') ||
+                t.closest('.mobile-controls');
+        };
 
         const handleGesture = () => {
             const now = Date.now();
@@ -406,6 +477,14 @@ class Input {
 
             const deltaX = touchEndX - touchStartX;
             const deltaY = touchEndY - touchStartY;
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            const duration = now - touchStartTime;
+
+            // Tap detection: short duration, small movement
+            if (distance < tapMaxDistance && duration < tapMaxDuration) {
+                this.game.rotate();
+                return;
+            }
 
             if (Math.abs(deltaX) > Math.abs(deltaY)) {
                 if (Math.abs(deltaX) > minSwipeDistance) {
@@ -414,27 +493,21 @@ class Input {
                 }
             } else {
                 if (Math.abs(deltaY) > minSwipeDistance) {
-                    if (deltaY > 0) this.game.hardDrop();
+                    if (deltaY > 0) this.game.drop(); // Soft drop instead of hard drop
                     else this.game.rotate();
                 }
             }
         };
 
-        const preventDefault = (e) => {
-            if (e.target.id !== 'action-btn' && e.target.id !== 'restart-btn' &&
-                e.target.id !== 'resume-btn' && !e.target.closest('#reward-container')) {
-                e.preventDefault();
-            }
-        };
-
         document.addEventListener('touchstart', (e) => {
-            preventDefault(e);
+            if (!isButton(e)) e.preventDefault();
             touchStartX = e.changedTouches[0].clientX;
             touchStartY = e.changedTouches[0].clientY;
+            touchStartTime = Date.now();
         }, { passive: false });
 
         document.addEventListener('touchend', (e) => {
-            preventDefault(e);
+            if (!isButton(e)) e.preventDefault();
             touchEndX = e.changedTouches[0].clientX;
             touchEndY = e.changedTouches[0].clientY;
             handleGesture();
@@ -457,6 +530,7 @@ class Game {
         // UI elements
         this.scoreElement = document.getElementById('score');
         this.levelElement = document.getElementById('level');
+        this.linesElement = document.getElementById('lines');
         this.finalScoreElement = document.getElementById('final-score');
         this.highScoreElement = document.getElementById('high-score');
         this.highScoreOverlayElement = document.getElementById('high-score-overlay');
@@ -468,6 +542,8 @@ class Game {
         this.resumeBtn = document.getElementById('resume-btn');
 
         this.rewardContainer = document.getElementById('reward-container');
+        this.newBestLabel = document.getElementById('new-best-label');
+        this.highScoreBoard = document.querySelector('.high-score-board');
         this.previewCanvas = document.getElementById('preview-canvas');
         this.holdCanvas = document.getElementById('hold-canvas');
 
@@ -487,6 +563,7 @@ class Game {
         this.isRunning = false;
         this.isPaused = false;
         this.isRewardActive = false;
+        this.isNewHighScore = false;
 
         this.lastTime = 0;
         this.dropCounter = 0;
@@ -502,10 +579,11 @@ class Game {
         this.clearAnimTimer = 0;
         this.clearAnimDuration = 400;
 
-        // Particles & trails
+        // Particles, trails & score popups
         this.particles = [];
         this.maxParticles = 200;
         this.dropTrails = [];
+        this.scorePopups = [];
 
         this.loop = this.loop.bind(this);
         this.setupUIListeners();
@@ -526,7 +604,9 @@ class Game {
 
         if (isMobile) {
             const headerH = gameInfo ? gameInfo.offsetHeight : 0;
-            availableHeight = window.innerHeight - headerH - 8;
+            const mobileControls = document.querySelector('.mobile-controls');
+            const controlsH = mobileControls ? mobileControls.offsetHeight : 0;
+            availableHeight = window.innerHeight - headerH - controlsH - 8;
             availableWidth = window.innerWidth - 8;
         } else {
             const sidebarW = gameInfo ? gameInfo.offsetWidth : 0;
@@ -565,6 +645,16 @@ class Game {
 
         this.resumeBtn.addEventListener('click', () => this.togglePause());
 
+        // Mobile touch buttons
+        const holdBtn = document.getElementById('hold-btn');
+        const hardDropBtn = document.getElementById('hard-drop-btn');
+        if (holdBtn) {
+            holdBtn.addEventListener('click', () => this.hold());
+        }
+        if (hardDropBtn) {
+            hardDropBtn.addEventListener('click', () => this.hardDrop());
+        }
+
         // Reward dismissal
         const dismissReward = (e) => {
             if (e.type === 'touchstart') e.preventDefault();
@@ -602,11 +692,15 @@ class Game {
         this.isRunning = true;
         this.isPaused = false;
         this.isRewardActive = false;
+        this.isNewHighScore = false;
         this.isClearAnimating = false;
+        if (this.newBestLabel) this.newBestLabel.classList.add('hidden');
+        if (this.highScoreBoard) this.highScoreBoard.classList.remove('celebrating');
         this.holdTetromino = null;
         this.canHold = true;
         this.particles = [];
         this.dropTrails = [];
+        this.scorePopups = [];
         this.updateActionButton();
 
         // Clear hold canvas
@@ -659,6 +753,8 @@ class Game {
 
         // Update preview
         if (this.previewCanvas) this.renderer.drawPreview(this.previewCanvas, this.nextTetromino);
+        // Refresh hold canvas to remove dimming
+        if (this.holdCanvas && this.holdTetromino) this.renderer.drawPreview(this.holdCanvas, this.holdTetromino, false);
 
         if (!this.grid.isValidPosition(this.activeTetromino)) {
             this.gameOver();
@@ -764,7 +860,7 @@ class Game {
         this.holdTetromino = new Tetromino(currentKey);
         this.lockTimer = this.lockDelay;
 
-        if (this.holdCanvas) this.renderer.drawPreview(this.holdCanvas, this.holdTetromino);
+        if (this.holdCanvas) this.renderer.drawPreview(this.holdCanvas, this.holdTetromino, !this.canHold);
 
         if (!this.grid.isValidPosition(this.activeTetromino)) {
             this.gameOver();
@@ -827,21 +923,68 @@ class Game {
     updateScore(linesCleared = 0) {
         if (linesCleared > 0) {
             const points = [0, 40, 100, 300, 1200];
-            this.score += points[linesCleared] * this.level;
+            const linePoints = points[linesCleared] * this.level;
+            this.score += linePoints;
 
             // Combo bonus
+            let comboPoints = 0;
             if (this.combo > 1) {
-                this.score += 50 * this.combo * this.level;
+                comboPoints = 50 * this.combo * this.level;
+                this.score += comboPoints;
+            }
+
+            // Floating score popups on canvas
+            const centerX = this.canvas.width / 2;
+            const centerY = this.canvas.height / 2;
+            const labels = ['', 'SINGLE', 'DOUBLE', 'TRIPLE', 'TETRIS'];
+            const colors = ['', '#db2777', '#c084fc', '#818cf8', '#facc15'];
+            this.scorePopups.push(new ScorePopup(
+                `${labels[linesCleared]}  +${linePoints}`,
+                centerX, centerY - 10,
+                colors[linesCleared]
+            ));
+            if (comboPoints > 0) {
+                this.scorePopups.push(new ScorePopup(
+                    `COMBO x${this.combo}  +${comboPoints}`,
+                    centerX, centerY + 20,
+                    '#f97316'
+                ));
             }
 
             this.lines += linesCleared;
+            const prevLevel = this.level;
             this.level = Math.floor(this.lines / 10) + 1;
             this.dropInterval = Math.max(100, 1000 - (this.level - 1) * 100);
+
+            // Level-up feedback
+            if (this.level > prevLevel) {
+                this.scorePopups.push(new ScorePopup(
+                    `LEVEL ${this.level}!`,
+                    this.canvas.width / 2, this.canvas.height / 2 - 40,
+                    '#db2777'
+                ));
+                // Flash the level board in the sidebar
+                const levelBoard = this.levelElement?.closest('.score-board');
+                if (levelBoard) {
+                    levelBoard.classList.remove('level-up-flash');
+                    void levelBoard.offsetWidth; // force reflow for re-triggering
+                    levelBoard.classList.add('level-up-flash');
+                    levelBoard.addEventListener('animationend', () => {
+                        levelBoard.classList.remove('level-up-flash');
+                    }, { once: true });
+                }
+            }
 
             // Update high score
             if (this.score > this.highScore) {
                 this.highScore = this.score;
                 localStorage.setItem('loltetris-highscore', this.highScore);
+                if (!this.isNewHighScore) {
+                    this.isNewHighScore = true;
+                    if (this.highScoreBoard) {
+                        this.highScoreBoard.classList.add('celebrating');
+                    }
+                }
             }
 
             // Haptic
@@ -860,6 +1003,7 @@ class Game {
     updateScoreDisplay() {
         this.scoreElement.textContent = this.score;
         this.levelElement.textContent = this.level;
+        if (this.linesElement) this.linesElement.textContent = this.lines;
         this.updateHighScoreDisplay();
     }
 
@@ -870,6 +1014,9 @@ class Game {
     }
 
     showRewardCat(lines) {
+        // Single-line clears: no popup, just particles are enough
+        if (lines < 2) return;
+
         const cats = [
             'assets/cat1.jpg', 'assets/cat2.jpg', 'assets/cat3.jpg', 'assets/cat4.jpg',
             'assets/cat5.jpg', 'assets/cat6.jpg', 'assets/cat7.jpg', 'assets/cat8.jpg'
@@ -879,10 +1026,8 @@ class Game {
         if (lines === 4) {
             src = 'assets/lolcat_laser_eyes.svg';
         } else if (lines >= 2) {
-            src = 'assets/lolcat_surprised_wow.svg';
-        } else {
             src = Math.random() < 0.5
-                ? 'assets/lolcat_happy_burger.svg'
+                ? 'assets/lolcat_surprised_wow.svg'
                 : cats[Math.floor(Math.random() * cats.length)];
         }
 
@@ -907,17 +1052,29 @@ class Game {
             localStorage.setItem('loltetris-highscore', this.highScore);
         }
 
-        const rewardImage = document.getElementById('reward-image');
-        rewardImage.src = 'assets/lolcat_grumpy_no.svg';
-        this.rewardContainer.classList.add('show');
-        setTimeout(() => this.rewardContainer.classList.remove('show'), 3000);
-
         this.finalScoreElement.textContent = this.score;
         if (this.highScoreOverlayElement) {
             this.highScoreOverlayElement.textContent = this.highScore;
         }
         this.updateHighScoreDisplay();
-        this.gameOverOverlay.classList.remove('hidden');
+
+        // Show/hide new best label
+        if (this.newBestLabel) {
+            if (this.isNewHighScore) {
+                this.newBestLabel.classList.remove('hidden');
+            } else {
+                this.newBestLabel.classList.add('hidden');
+            }
+        }
+
+        // Show grumpy cat first, then game-over overlay after it fades
+        const rewardImage = document.getElementById('reward-image');
+        rewardImage.src = 'assets/lolcat_grumpy_no.svg';
+        this.rewardContainer.classList.add('show');
+        setTimeout(() => {
+            this.rewardContainer.classList.remove('show');
+            this.gameOverOverlay.classList.remove('hidden');
+        }, 2000);
     }
 
     loop(time = 0) {
@@ -930,6 +1087,12 @@ class Game {
         this.particles = this.particles.filter(p => {
             p.update();
             return p.alive;
+        });
+
+        // Update score popups
+        this.scorePopups = this.scorePopups.filter(s => {
+            s.update();
+            return s.alive;
         });
 
         // Update drop trails
@@ -947,7 +1110,7 @@ class Game {
             } else {
                 const progress = 1 - (this.clearAnimTimer / this.clearAnimDuration);
                 const flashOn = Math.floor(progress * 6) % 2 === 0;
-                this.renderer.draw(this.activeTetromino, this.clearingLines, flashOn, this.dropTrails, this.particles);
+                this.renderer.draw(this.activeTetromino, this.clearingLines, flashOn, this.dropTrails, this.particles, this.scorePopups);
                 requestAnimationFrame(this.loop);
                 return;
             }
@@ -975,7 +1138,7 @@ class Game {
             }
         }
 
-        this.renderer.draw(this.activeTetromino, [], false, this.dropTrails, this.particles);
+        this.renderer.draw(this.activeTetromino, [], false, this.dropTrails, this.particles, this.scorePopups);
         requestAnimationFrame(this.loop);
     }
 }

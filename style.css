@@ -87,6 +87,7 @@ h1 {
 
 #score,
 #level,
+#lines,
 #high-score {
     font-size: 2rem;
     font-weight: 700;
@@ -264,6 +265,51 @@ canvas#game-canvas {
     min-height: 44px;
 }
 
+/* New best score celebration */
+.new-best {
+    font-size: 1.8rem !important;
+    color: #facc15;
+    font-weight: 900;
+    text-shadow: 2px 2px 0px #ca8a04;
+    animation: pulse-gold 0.6s ease-in-out infinite alternate;
+    margin-bottom: 0.5rem !important;
+}
+
+.new-best.hidden {
+    display: none;
+}
+
+@keyframes pulse-gold {
+    from { transform: scale(1); }
+    to { transform: scale(1.1); }
+}
+
+.high-score-board.celebrating {
+    animation: gold-glow 0.5s ease-in-out 3;
+    border-color: #facc15;
+    box-shadow: 0 0 12px rgba(250, 204, 21, 0.5);
+}
+
+@keyframes gold-glow {
+    0%, 100% { box-shadow: 0 0 4px rgba(250, 204, 21, 0.3); }
+    50% { box-shadow: 0 0 16px rgba(250, 204, 21, 0.7); }
+}
+
+/* Level-up flash */
+.level-up-flash {
+    animation: level-flash 0.4s ease-in-out 2;
+}
+
+@keyframes level-flash {
+    0%, 100% { background: #fff; }
+    50% { background: #fbcfe8; }
+}
+
+/* Mobile touch buttons (hidden on desktop) */
+.mobile-controls {
+    display: none;
+}
+
 /* Screen shake animation */
 @keyframes shake {
     0%, 100% { transform: translate(0, 0); }
@@ -362,6 +408,7 @@ canvas#game-canvas.shake {
 
     #score,
     #level,
+    #lines,
     #high-score {
         font-size: 0.9rem;
         line-height: 1.1;
@@ -385,8 +432,8 @@ canvas#game-canvas.shake {
     }
 
     .preview-box canvas {
-        width: 28px;
-        height: 28px;
+        width: 38px;
+        height: 38px;
         margin: 0;
         border-width: 1px;
         border-radius: 3px;
@@ -417,6 +464,25 @@ canvas#game-canvas.shake {
         flex-shrink: 0;
         border: 3px solid var(--accent-color);
         border-radius: 8px;
+    }
+
+    /* Mobile touch buttons */
+    .mobile-controls {
+        display: flex;
+        gap: 12px;
+        padding: 6px 16px;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.7);
+    }
+
+    .mobile-btn {
+        padding: 6px 20px;
+        font-size: 0.75rem;
+        border-radius: 8px;
+        border-bottom-width: 2px;
+        min-height: 36px;
+        flex: 1;
+        max-width: 120px;
     }
 }
 
@@ -456,7 +522,7 @@ canvas#game-canvas.shake {
     }
 
     .preview-box canvas {
-        width: 30px;
-        height: 30px;
+        width: 36px;
+        height: 36px;
     }
 }
