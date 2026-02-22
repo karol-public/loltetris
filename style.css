@@ -118,6 +118,11 @@ h1 {
     height: 80px;
 }
 
+/* On desktop, hide the mobile-only inline preview/hold boxes (direct children, not inside .preview-section) */
+.game-info > .preview-box {
+    display: none;
+}
+
 .controls-info {
     margin-top: auto;
     font-size: 0.9rem;
@@ -293,6 +298,8 @@ canvas#game-canvas.shake {
     body {
         padding: 0;
         align-items: stretch;
+        background-image: none;
+        background-color: var(--grid-color);
     }
 
     #app {
@@ -316,54 +323,55 @@ canvas#game-canvas.shake {
         border-radius: 0;
         box-shadow: none;
         gap: 0;
-        background: transparent;
+        background: var(--grid-color);
     }
 
-    /* ---- Header bar ---- */
+    /* ---- Single header row: [NEXT] [SCORE] [LEVEL] [HOLD] [PAUSE] ---- */
     .game-info {
         flex-direction: row;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         justify-content: center;
         align-items: center;
         width: 100%;
-        padding: 6px 8px;
+        padding: 4px 6px;
         min-width: 0;
-        gap: 4px 6px;
+        gap: 4px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 0;
     }
 
     h1 {
-        font-size: 0.9rem;
-        margin: 0;
-        line-height: 1;
-        text-align: left;
-        transform: none;
-        text-shadow: 1px 1px 0px #fbcfe8;
+        display: none;
     }
 
     .score-board {
-        padding: 2px 8px;
-        border-radius: 0.5rem;
+        padding: 2px 6px;
+        border-radius: 6px;
         border-width: 1.5px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
         min-width: 0;
+        flex: 0 1 auto;
+        background: rgba(255, 255, 255, 0.9);
     }
 
     .score-label {
-        font-size: 0.5rem;
+        font-size: 0.45rem;
         margin-bottom: 0;
+        letter-spacing: 0.5px;
     }
 
     #score,
     #level,
     #high-score {
         font-size: 0.85rem;
-        line-height: 1;
+        line-height: 1.1;
     }
 
-    /* Hide best score in header on mobile (still shown in game-over overlay) */
+    /* Hide best score and desktop preview section on mobile */
     .high-score-board {
+        display: none;
+    }
+
+    .preview-section {
         display: none;
     }
 
@@ -371,81 +379,79 @@ canvas#game-canvas.shake {
         display: none;
     }
 
-    /* Preview boxes wrap to their own row */
-    .preview-section {
-        flex-basis: 100%;
-        justify-content: center;
-        gap: 8px;
-        order: 10;
-    }
-
-    .preview-box {
-        flex: 0;
-        padding: 2px 6px;
-        border-radius: 0.4rem;
-        border-width: 1.5px;
+    /* Show inline NEXT and HOLD boxes on mobile */
+    .game-info > .preview-box {
         display: flex;
         align-items: center;
-        gap: 4px;
+        gap: 3px;
+        padding: 2px 5px;
+        border-radius: 6px;
+        border-width: 1.5px;
+        flex: 0 0 auto;
+        background: rgba(255, 255, 255, 0.9);
     }
 
-    .preview-box .score-label {
-        font-size: 0.5rem;
+    .game-info > .preview-box .score-label {
+        font-size: 0.45rem;
         margin: 0;
-        writing-mode: horizontal-tb;
+        writing-mode: vertical-lr;
+        text-orientation: mixed;
+        letter-spacing: 0.5px;
     }
 
-    .preview-box canvas {
-        width: 32px;
-        height: 32px;
+    .game-info > .preview-box canvas {
+        width: 28px;
+        height: 28px;
         margin: 0;
         border-width: 1px;
         border-radius: 3px;
     }
 
     #action-btn {
-        padding: 3px 10px;
-        font-size: 0.7rem;
+        padding: 2px 8px;
+        font-size: 0.65rem;
         min-height: auto;
         white-space: nowrap;
         flex-shrink: 0;
-        border-radius: 0.5rem;
+        border-radius: 6px;
         border-bottom-width: 2px;
         width: auto;
         margin: 0;
     }
 
-    /* ---- Canvas ---- */
+    /* ---- Canvas fills the space ---- */
     canvas#game-canvas {
         display: block;
-        margin: 4px auto;
+        margin: 0 auto;
         flex-shrink: 0;
-        border-width: 3px;
+        border-width: 0;
+        border-radius: 0;
     }
 
-    /* ---- Touch controls ---- */
+    /* ---- Touch controls: 2 rows ---- */
     #touch-controls {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 4px;
-        padding: 4px 12px;
-        padding-bottom: max(8px, env(safe-area-inset-bottom));
+        gap: 6px;
+        padding: 6px 12px;
+        padding-bottom: max(6px, env(safe-area-inset-bottom));
         flex-shrink: 0;
+        background: rgba(0, 0, 0, 0.3);
     }
 
     .touch-row {
         display: flex;
-        gap: 10px;
+        gap: 12px;
         justify-content: center;
         align-items: center;
     }
 
     .touch-btn {
-        width: 50px;
-        height: 50px;
+        width: 48px;
+        height: 48px;
         border-radius: 50%;
-        font-size: 1.3rem;
+        font-size: 1.2rem;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -454,19 +460,22 @@ canvas#game-canvas.shake {
         -webkit-tap-highlight-color: transparent;
         user-select: none;
         touch-action: manipulation;
+        opacity: 0.85;
     }
 
     .touch-btn-small {
         width: 40px;
         height: 40px;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
     }
 
     .touch-btn-wide {
-        width: auto;
+        width: 100%;
+        max-width: 280px;
+        height: 42px;
         border-radius: 1.5rem;
         padding: 0 1.2rem;
-        font-size: 0.9rem;
+        font-size: 1rem;
     }
 }
 
@@ -488,30 +497,29 @@ canvas#game-canvas.shake {
     .game-info {
         flex-direction: column;
         flex-wrap: nowrap;
-        min-width: 80px;
-        max-width: 100px;
-        gap: 4px;
+        min-width: 70px;
+        max-width: 90px;
+        gap: 3px;
         padding: 4px;
+        background: transparent;
     }
 
-    .preview-section {
-        flex-basis: auto;
+    h1 {
+        display: block;
+        font-size: 0.8rem;
+    }
+
+    .game-info > .preview-box {
         flex-direction: column;
-        order: 0;
-        gap: 4px;
     }
 
-    .preview-box {
-        flex-direction: column;
+    .game-info > .preview-box .score-label {
+        writing-mode: horizontal-tb;
     }
 
-    .preview-box canvas {
+    .game-info > .preview-box canvas {
         width: 30px;
         height: 30px;
-    }
-
-    .high-score-board {
-        display: none;
     }
 
     #touch-controls {
@@ -523,10 +531,15 @@ canvas#game-canvas.shake {
         gap: 4px;
     }
 
+    .touch-row {
+        flex-direction: column;
+        gap: 6px;
+    }
+
     .touch-btn {
-        width: 44px;
-        height: 44px;
-        font-size: 1.1rem;
+        width: 42px;
+        height: 42px;
+        font-size: 1rem;
     }
 
     .touch-btn-small {
@@ -536,7 +549,11 @@ canvas#game-canvas.shake {
     }
 
     .touch-btn-wide {
-        padding: 0 0.8rem;
-        font-size: 0.8rem;
+        width: 42px;
+        max-width: none;
+        height: 42px;
+        border-radius: 50%;
+        padding: 0;
+        font-size: 0.6rem;
     }
 }

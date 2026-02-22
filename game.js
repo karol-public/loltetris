@@ -490,8 +490,14 @@ class Game {
         this.resumeBtn = document.getElementById('resume-btn');
 
         this.rewardContainer = document.getElementById('reward-container');
-        this.previewCanvas = document.getElementById('preview-canvas');
-        this.holdCanvas = document.getElementById('hold-canvas');
+        this.previewCanvases = [
+            document.getElementById('preview-canvas'),
+            document.getElementById('preview-canvas-desktop')
+        ].filter(Boolean);
+        this.holdCanvases = [
+            document.getElementById('hold-canvas'),
+            document.getElementById('hold-canvas-desktop')
+        ].filter(Boolean);
 
         // Game state
         this.score = 0;
@@ -634,9 +640,7 @@ class Game {
         this.updateActionButton();
 
         // Clear hold canvas
-        if (this.holdCanvas) {
-            this.renderer.drawPreview(this.holdCanvas, null);
-        }
+        for (const c of this.holdCanvases) this.renderer.drawPreview(c, null);
 
         // Generate first next piece and spawn
         this.nextTetromino = getRandomTetromino();
@@ -684,9 +688,7 @@ class Game {
         this.canHold = true;
 
         // Update preview
-        if (this.previewCanvas) {
-            this.renderer.drawPreview(this.previewCanvas, this.nextTetromino);
-        }
+        for (const c of this.previewCanvases) this.renderer.drawPreview(c, this.nextTetromino);
 
         if (!this.grid.isValidPosition(this.activeTetromino)) {
             this.gameOver();
@@ -786,17 +788,13 @@ class Game {
             this.nextTetromino = getRandomTetromino();
             this.activeTetromino.x = Math.floor(this.grid.width / 2) - Math.floor(this.activeTetromino.matrix[0].length / 2);
             this.activeTetromino.y = 0;
-            if (this.previewCanvas) {
-                this.renderer.drawPreview(this.previewCanvas, this.nextTetromino);
-            }
+            for (const c of this.previewCanvases) this.renderer.drawPreview(c, this.nextTetromino);
         }
 
         this.holdTetromino = new Tetromino(currentKey);
         this.lockTimer = this.lockDelay;
 
-        if (this.holdCanvas) {
-            this.renderer.drawPreview(this.holdCanvas, this.holdTetromino);
-        }
+        for (const c of this.holdCanvases) this.renderer.drawPreview(c, this.holdTetromino);
 
         if (!this.grid.isValidPosition(this.activeTetromino)) {
             this.gameOver();

@@ -13,6 +13,10 @@
         <div class="game-container">
             <div class="game-info">
                 <h1>LOL<br>TETRIS</h1>
+                <div class="preview-box">
+                    <div class="score-label">NEXT</div>
+                    <canvas id="preview-canvas" width="100" height="100"></canvas>
+                </div>
                 <div class="score-board">
                     <div class="score-label">SCORE</div>
                     <div id="score">0</div>
@@ -25,14 +29,18 @@
                     <div class="score-label">BEST</div>
                     <div id="high-score">0</div>
                 </div>
+                <div class="preview-box">
+                    <div class="score-label">HOLD</div>
+                    <canvas id="hold-canvas" width="100" height="100"></canvas>
+                </div>
                 <div class="preview-section">
                     <div class="preview-box">
                         <div class="score-label">NEXT</div>
-                        <canvas id="preview-canvas" width="100" height="100"></canvas>
+                        <canvas id="preview-canvas-desktop" width="100" height="100"></canvas>
                     </div>
                     <div class="preview-box">
                         <div class="score-label">HOLD</div>
-                        <canvas id="hold-canvas" width="100" height="100"></canvas>
+                        <canvas id="hold-canvas-desktop" width="100" height="100"></canvas>
                     </div>
                 </div>
                 <div class="controls-info">
@@ -66,16 +74,14 @@
 
         <!-- Touch Controls -->
         <div id="touch-controls">
-            <div class="touch-row touch-row-top">
+            <div class="touch-row">
                 <button id="touch-rotate" class="touch-btn" aria-label="Rotate">&#x21BB;</button>
-            </div>
-            <div class="touch-row touch-row-mid">
                 <button id="touch-left" class="touch-btn" aria-label="Move Left">&#x25C0;</button>
-                <button id="touch-hold" class="touch-btn touch-btn-small" aria-label="Hold">H</button>
-                <button id="touch-right" class="touch-btn" aria-label="Move Right">&#x25B6;</button>
-            </div>
-            <div class="touch-row touch-row-bottom">
                 <button id="touch-down" class="touch-btn" aria-label="Soft Drop">&#x25BC;</button>
+                <button id="touch-right" class="touch-btn" aria-label="Move Right">&#x25B6;</button>
+                <button id="touch-hold" class="touch-btn touch-btn-small" aria-label="Hold">H</button>
+            </div>
+            <div class="touch-row">
                 <button id="touch-drop" class="touch-btn touch-btn-wide" aria-label="Hard Drop">DROP</button>
             </div>
         </div>
