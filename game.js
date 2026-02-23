@@ -170,7 +170,7 @@ class Renderer {
         this.canvas.height = this.grid.height * this.blockSize;
     }
 
-    draw(activeTetromino, flashingRows = [], flashOn = false, dropTrails = [], particles = [], scorePopups = []) {
+    draw(activeTetromino, flashingRows = [], flashOn = false, dropTrails = [], particles = []) {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
         this.drawGridLines();
@@ -183,7 +183,6 @@ class Renderer {
         }
 
         this.drawParticles(particles);
-        this.drawScorePopups(scorePopups);
     }
 
     drawGridLines() {
@@ -234,27 +233,8 @@ class Renderer {
         }
         ghost.y--;
 
-        // Draw filled ghost at higher opacity
-        this.ctx.globalAlpha = 0.3;
+        this.ctx.globalAlpha = 0.2;
         this.drawTetromino(ghost);
-        this.ctx.globalAlpha = 1.0;
-
-        // Draw dashed outline for extra visibility
-        const bs = this.blockSize;
-        this.ctx.strokeStyle = tetromino.color;
-        this.ctx.lineWidth = 1.5;
-        this.ctx.globalAlpha = 0.5;
-        this.ctx.setLineDash([3, 3]);
-        for (let r = 0; r < ghost.matrix.length; r++) {
-            for (let c = 0; c < ghost.matrix[r].length; c++) {
-                if (ghost.matrix[r][c]) {
-                    const px = (ghost.x + c) * bs + 1;
-                    const py = (ghost.y + r) * bs + 1;
-                    this.ctx.strokeRect(px, py, bs - 2, bs - 2);
-                }
-            }
-        }
-        this.ctx.setLineDash([]);
         this.ctx.globalAlpha = 1.0;
     }
 
@@ -281,7 +261,7 @@ class Renderer {
         this.ctx.fillRect(px + 2, py + size - 2, size - 4, 2);
     }
 
-    drawPreview(canvas, tetromino, dimmed = false) {
+    drawPreview(canvas, tetromino) {
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (!tetromino) return;
@@ -310,11 +290,6 @@ class Renderer {
                 }
             }
         }
-
-        if (dimmed) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
     }
 
     drawDropTrails(trails) {
@@ -335,20 +310,6 @@ class Renderer {
             this.ctx.globalAlpha = p.life;
             this.ctx.fillStyle = p.color;
             this.ctx.fillRect(p.x, p.y, p.size, p.size);
-        }
-        this.ctx.globalAlpha = 1.0;
-    }
-
-    drawScorePopups(popups) {
-        for (const popup of popups) {
-            this.ctx.globalAlpha = popup.life;
-            this.ctx.fillStyle = popup.color;
-            this.ctx.font = 'bold 18px "Comic Sans MS", sans-serif';
-            this.ctx.textAlign = 'center';
-            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-            this.ctx.lineWidth = 3;
-            this.ctx.strokeText(popup.text, popup.x, popup.y);
-            this.ctx.fillText(popup.text, popup.x, popup.y);
         }
         this.ctx.globalAlpha = 1.0;
     }
@@ -379,25 +340,48 @@ class Particle {
     }
 }
 
-// Score popup (floating +points text)
-class ScorePopup {
-    constructor(text, x, y, color = '#db2777') {
-        this.text = text;
-        this.x = x;
-        this.y = y;
-        this.color = color;
-        this.life = 1.0;
-        this.decay = 0.015;
-        this.vy = -1.5;
+// Sound Manager
+class SoundManager {
+    constructor() {
+        this.sounds = {
+            clear1: 'assets/meow_short.mp3',
+            clear2: 'assets/meow_excited.mp3',
+            clear4: 'assets/purr_celebration.mp3',
+            gameOver: 'assets/sad_meow.mp3'
+        };
+        this.muted = localStorage.getItem('loltetris-muted') === 'true';
+        this.audioCache = {};
     }
 
-    update() {
-        this.y += this.vy;
-        this.life -= this.decay;
+    preload() {
+        for (const [key, src] of Object.entries(this.sounds)) {
+            const audio = new Audio(src);
+            audio.preload = 'auto';
+            this.audioCache[key] = audio;
+        }
     }
 
-    get alive() {
-        return this.life > 0;
+    play(key) {
+        if (this.muted || !this.audioCache[key]) return;
+        const sound = this.audioCache[key].cloneNode(true);
+        sound.volume = 0.6;
+        sound.play().catch(() => {});
+    }
+
+    playClear(lines) {
+        if (lines >= 4) this.play('clear4');
+        else if (lines >= 2) this.play('clear2');
+        else this.play('clear1');
+    }
+
+    playGameOver() {
+        this.play('gameOver');
+    }
+
+    toggleMute() {
+        this.muted = !this.muted;
+        localStorage.setItem('loltetris-muted', this.muted);
+        return this.muted;
     }
 }
 
@@ -446,9 +430,6 @@ class Input {
                 case 'Space':
                     this.game.hardDrop();
                     break;
-                case 'KeyC':
-                    this.game.hold();
-                    break;
             }
         });
     }
@@ -458,17 +439,7 @@ class Input {
         let touchStartY = 0;
         let touchEndX = 0;
         let touchEndY = 0;
-        let touchStartTime = 0;
         const minSwipeDistance = 30;
-        const tapMaxDistance = 15;
-        const tapMaxDuration = 250;
-
-        const isButton = (e) => {
-            const t = e.target;
-            return t.id === 'action-btn' || t.id === 'restart-btn' ||
-                t.id === 'resume-btn' || t.closest('#reward-container') ||
-                t.closest('.mobile-controls');
-        };
 
         const handleGesture = () => {
             const now = Date.now();
@@ -478,10 +449,8 @@ class Input {
             const deltaX = touchEndX - touchStartX;
             const deltaY = touchEndY - touchStartY;
             const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-            const duration = now - touchStartTime;
 
-            // Tap detection: short duration, small movement
-            if (distance < tapMaxDistance && duration < tapMaxDuration) {
+            if (distance < minSwipeDistance) {
                 this.game.rotate();
                 return;
             }
@@ -493,21 +462,28 @@ class Input {
                 }
             } else {
                 if (Math.abs(deltaY) > minSwipeDistance) {
-                    if (deltaY > 0) this.game.drop(); // Soft drop instead of hard drop
+                    if (deltaY > 0) this.game.hardDrop();
                     else this.game.rotate();
                 }
             }
         };
 
+        const preventDefault = (e) => {
+            if (e.target.id !== 'action-btn' && e.target.id !== 'restart-btn' &&
+                e.target.id !== 'resume-btn' && e.target.id !== 'mute-btn' &&
+                !e.target.closest('#reward-container')) {
+                e.preventDefault();
+            }
+        };
+
         document.addEventListener('touchstart', (e) => {
-            if (!isButton(e)) e.preventDefault();
+            preventDefault(e);
             touchStartX = e.changedTouches[0].clientX;
             touchStartY = e.changedTouches[0].clientY;
-            touchStartTime = Date.now();
         }, { passive: false });
 
         document.addEventListener('touchend', (e) => {
-            if (!isButton(e)) e.preventDefault();
+            preventDefault(e);
             touchEndX = e.changedTouches[0].clientX;
             touchEndY = e.changedTouches[0].clientY;
             handleGesture();
@@ -526,11 +502,12 @@ class Game {
 
         this.renderer = new Renderer(this.canvas, this.grid, this.blockSize);
         this.input = new Input(this);
+        this.soundManager = new SoundManager();
+        this.soundManager.preload();
 
         // UI elements
         this.scoreElement = document.getElementById('score');
         this.levelElement = document.getElementById('level');
-        this.linesElement = document.getElementById('lines');
         this.finalScoreElement = document.getElementById('final-score');
         this.highScoreElement = document.getElementById('high-score');
         this.highScoreOverlayElement = document.getElementById('high-score-overlay');
@@ -540,12 +517,10 @@ class Game {
         this.actionBtn = document.getElementById('action-btn');
         this.restartBtn = document.getElementById('restart-btn');
         this.resumeBtn = document.getElementById('resume-btn');
+        this.muteBtn = document.getElementById('mute-btn');
 
         this.rewardContainer = document.getElementById('reward-container');
-        this.newBestLabel = document.getElementById('new-best-label');
-        this.highScoreBoard = document.querySelector('.high-score-board');
         this.previewCanvas = document.getElementById('preview-canvas');
-        this.holdCanvas = document.getElementById('hold-canvas');
 
         // Game state
         this.score = 0;
@@ -555,15 +530,12 @@ class Game {
 
         this.activeTetromino = null;
         this.nextTetromino = null;
-        this.holdTetromino = null;
-        this.canHold = true;
         this.combo = 0;
 
         this.isGameOver = false;
         this.isRunning = false;
         this.isPaused = false;
         this.isRewardActive = false;
-        this.isNewHighScore = false;
 
         this.lastTime = 0;
         this.dropCounter = 0;
@@ -579,15 +551,15 @@ class Game {
         this.clearAnimTimer = 0;
         this.clearAnimDuration = 400;
 
-        // Particles, trails & score popups
+        // Particles & trails
         this.particles = [];
         this.maxParticles = 200;
         this.dropTrails = [];
-        this.scorePopups = [];
 
         this.loop = this.loop.bind(this);
         this.setupUIListeners();
         this.updateHighScoreDisplay();
+        this.preloadImages();
 
         window.addEventListener('resize', () => {
             this.resize();
@@ -603,11 +575,9 @@ class Game {
         let availableHeight, availableWidth;
 
         if (isMobile) {
-            const headerH = gameInfo ? gameInfo.offsetHeight : 0;
-            const mobileControls = document.querySelector('.mobile-controls');
-            const controlsH = mobileControls ? mobileControls.offsetHeight : 0;
-            availableHeight = window.innerHeight - headerH - controlsH - 8;
-            availableWidth = window.innerWidth - 8;
+            const sidebarW = gameInfo ? gameInfo.offsetWidth : 0;
+            availableHeight = window.innerHeight - 8;
+            availableWidth = window.innerWidth - sidebarW - 8;
         } else {
             const sidebarW = gameInfo ? gameInfo.offsetWidth : 0;
             availableHeight = window.innerHeight - 120;
@@ -645,14 +615,12 @@ class Game {
 
         this.resumeBtn.addEventListener('click', () => this.togglePause());
 
-        // Mobile touch buttons
-        const holdBtn = document.getElementById('hold-btn');
-        const hardDropBtn = document.getElementById('hard-drop-btn');
-        if (holdBtn) {
-            holdBtn.addEventListener('click', () => this.hold());
-        }
-        if (hardDropBtn) {
-            hardDropBtn.addEventListener('click', () => this.hardDrop());
+        if (this.muteBtn) {
+            this.muteBtn.textContent = this.soundManager.muted ? '🔇' : '🔊';
+            this.muteBtn.addEventListener('click', () => {
+                const muted = this.soundManager.toggleMute();
+                this.muteBtn.textContent = muted ? '🔇' : '🔊';
+            });
         }
 
         // Reward dismissal
@@ -692,19 +660,10 @@ class Game {
         this.isRunning = true;
         this.isPaused = false;
         this.isRewardActive = false;
-        this.isNewHighScore = false;
         this.isClearAnimating = false;
-        if (this.newBestLabel) this.newBestLabel.classList.add('hidden');
-        if (this.highScoreBoard) this.highScoreBoard.classList.remove('celebrating');
-        this.holdTetromino = null;
-        this.canHold = true;
         this.particles = [];
         this.dropTrails = [];
-        this.scorePopups = [];
         this.updateActionButton();
-
-        // Clear hold canvas
-        if (this.holdCanvas) this.renderer.drawPreview(this.holdCanvas, null);
 
         // Generate first next piece and spawn
         this.nextTetromino = getRandomTetromino();
@@ -749,12 +708,9 @@ class Game {
         this.activeTetromino.x = Math.floor(this.grid.width / 2) - Math.floor(this.activeTetromino.matrix[0].length / 2);
         this.activeTetromino.y = 0;
         this.lockTimer = this.lockDelay;
-        this.canHold = true;
 
         // Update preview
         if (this.previewCanvas) this.renderer.drawPreview(this.previewCanvas, this.nextTetromino);
-        // Refresh hold canvas to remove dimming
-        if (this.holdCanvas && this.holdTetromino) this.renderer.drawPreview(this.holdCanvas, this.holdTetromino, false);
 
         if (!this.grid.isValidPosition(this.activeTetromino)) {
             this.gameOver();
@@ -837,36 +793,6 @@ class Game {
         this.dropCounter = 0;
     }
 
-    hold() {
-        if (!this.isRunning || this.isPaused || !this.canHold || this.isClearAnimating) return;
-
-        this.canHold = false;
-        const currentKey = this.activeTetromino.shapeKey;
-
-        if (this.holdTetromino) {
-            // Swap with hold
-            this.activeTetromino = new Tetromino(this.holdTetromino.shapeKey);
-            this.activeTetromino.x = Math.floor(this.grid.width / 2) - Math.floor(this.activeTetromino.matrix[0].length / 2);
-            this.activeTetromino.y = 0;
-        } else {
-            // No hold piece yet, take from next
-            this.activeTetromino = this.nextTetromino;
-            this.nextTetromino = getRandomTetromino();
-            this.activeTetromino.x = Math.floor(this.grid.width / 2) - Math.floor(this.activeTetromino.matrix[0].length / 2);
-            this.activeTetromino.y = 0;
-            if (this.previewCanvas) this.renderer.drawPreview(this.previewCanvas, this.nextTetromino);
-        }
-
-        this.holdTetromino = new Tetromino(currentKey);
-        this.lockTimer = this.lockDelay;
-
-        if (this.holdCanvas) this.renderer.drawPreview(this.holdCanvas, this.holdTetromino, !this.canHold);
-
-        if (!this.grid.isValidPosition(this.activeTetromino)) {
-            this.gameOver();
-        }
-    }
-
     lock() {
         this.grid.lockTetromino(this.activeTetromino);
         vibrate(30);
@@ -923,68 +849,21 @@ class Game {
     updateScore(linesCleared = 0) {
         if (linesCleared > 0) {
             const points = [0, 40, 100, 300, 1200];
-            const linePoints = points[linesCleared] * this.level;
-            this.score += linePoints;
+            this.score += points[linesCleared] * this.level;
 
             // Combo bonus
-            let comboPoints = 0;
             if (this.combo > 1) {
-                comboPoints = 50 * this.combo * this.level;
-                this.score += comboPoints;
-            }
-
-            // Floating score popups on canvas
-            const centerX = this.canvas.width / 2;
-            const centerY = this.canvas.height / 2;
-            const labels = ['', 'SINGLE', 'DOUBLE', 'TRIPLE', 'TETRIS'];
-            const colors = ['', '#db2777', '#c084fc', '#818cf8', '#facc15'];
-            this.scorePopups.push(new ScorePopup(
-                `${labels[linesCleared]}  +${linePoints}`,
-                centerX, centerY - 10,
-                colors[linesCleared]
-            ));
-            if (comboPoints > 0) {
-                this.scorePopups.push(new ScorePopup(
-                    `COMBO x${this.combo}  +${comboPoints}`,
-                    centerX, centerY + 20,
-                    '#f97316'
-                ));
+                this.score += 50 * this.combo * this.level;
             }
 
             this.lines += linesCleared;
-            const prevLevel = this.level;
             this.level = Math.floor(this.lines / 10) + 1;
             this.dropInterval = Math.max(100, 1000 - (this.level - 1) * 100);
-
-            // Level-up feedback
-            if (this.level > prevLevel) {
-                this.scorePopups.push(new ScorePopup(
-                    `LEVEL ${this.level}!`,
-                    this.canvas.width / 2, this.canvas.height / 2 - 40,
-                    '#db2777'
-                ));
-                // Flash the level board in the sidebar
-                const levelBoard = this.levelElement?.closest('.score-board');
-                if (levelBoard) {
-                    levelBoard.classList.remove('level-up-flash');
-                    void levelBoard.offsetWidth; // force reflow for re-triggering
-                    levelBoard.classList.add('level-up-flash');
-                    levelBoard.addEventListener('animationend', () => {
-                        levelBoard.classList.remove('level-up-flash');
-                    }, { once: true });
-                }
-            }
 
             // Update high score
             if (this.score > this.highScore) {
                 this.highScore = this.score;
                 localStorage.setItem('loltetris-highscore', this.highScore);
-                if (!this.isNewHighScore) {
-                    this.isNewHighScore = true;
-                    if (this.highScoreBoard) {
-                        this.highScoreBoard.classList.add('celebrating');
-                    }
-                }
             }
 
             // Haptic
@@ -1003,7 +882,6 @@ class Game {
     updateScoreDisplay() {
         this.scoreElement.textContent = this.score;
         this.levelElement.textContent = this.level;
-        if (this.linesElement) this.linesElement.textContent = this.lines;
         this.updateHighScoreDisplay();
     }
 
@@ -1013,27 +891,37 @@ class Game {
         }
     }
 
-    showRewardCat(lines) {
-        // Single-line clears: no popup, just particles are enough
-        if (lines < 2) return;
+    preloadImages() {
+        const images = [];
+        for (let i = 1; i <= 18; i++) images.push(`assets/cat${i}.jpg`);
+        images.push('assets/lolcat_laser_eyes.svg', 'assets/lolcat_surprised_wow.svg',
+            'assets/lolcat_happy_burger.svg', 'assets/lolcat_grumpy_no.svg');
+        for (const src of images) {
+            const img = new Image();
+            img.src = src;
+        }
+    }
 
-        const cats = [
-            'assets/cat1.jpg', 'assets/cat2.jpg', 'assets/cat3.jpg', 'assets/cat4.jpg',
-            'assets/cat5.jpg', 'assets/cat6.jpg', 'assets/cat7.jpg', 'assets/cat8.jpg'
-        ];
+    showRewardCat(lines) {
+        const CAT_COUNT = 18;
+        const cats = [];
+        for (let i = 1; i <= CAT_COUNT; i++) cats.push(`assets/cat${i}.jpg`);
 
         let src;
         if (lines === 4) {
             src = 'assets/lolcat_laser_eyes.svg';
         } else if (lines >= 2) {
+            src = 'assets/lolcat_surprised_wow.svg';
+        } else {
             src = Math.random() < 0.5
-                ? 'assets/lolcat_surprised_wow.svg'
+                ? 'assets/lolcat_happy_burger.svg'
                 : cats[Math.floor(Math.random() * cats.length)];
         }
 
         const rewardImage = document.getElementById('reward-image');
         rewardImage.src = src;
         this.rewardContainer.classList.add('show');
+        this.soundManager.playClear(lines);
 
         this.isPaused = true;
         this.isRewardActive = true;
@@ -1045,6 +933,7 @@ class Game {
         this.isGameOver = true;
         this.updateActionButton();
         vibrate(200);
+        this.soundManager.playGameOver();
 
         // Update high score
         if (this.score > this.highScore) {
@@ -1052,29 +941,17 @@ class Game {
             localStorage.setItem('loltetris-highscore', this.highScore);
         }
 
+        const rewardImage = document.getElementById('reward-image');
+        rewardImage.src = 'assets/lolcat_grumpy_no.svg';
+        this.rewardContainer.classList.add('show');
+        setTimeout(() => this.rewardContainer.classList.remove('show'), 3000);
+
         this.finalScoreElement.textContent = this.score;
         if (this.highScoreOverlayElement) {
             this.highScoreOverlayElement.textContent = this.highScore;
         }
         this.updateHighScoreDisplay();
-
-        // Show/hide new best label
-        if (this.newBestLabel) {
-            if (this.isNewHighScore) {
-                this.newBestLabel.classList.remove('hidden');
-            } else {
-                this.newBestLabel.classList.add('hidden');
-            }
-        }
-
-        // Show grumpy cat first, then game-over overlay after it fades
-        const rewardImage = document.getElementById('reward-image');
-        rewardImage.src = 'assets/lolcat_grumpy_no.svg';
-        this.rewardContainer.classList.add('show');
-        setTimeout(() => {
-            this.rewardContainer.classList.remove('show');
-            this.gameOverOverlay.classList.remove('hidden');
-        }, 2000);
+        this.gameOverOverlay.classList.remove('hidden');
     }
 
     loop(time = 0) {
@@ -1087,12 +964,6 @@ class Game {
         this.particles = this.particles.filter(p => {
             p.update();
             return p.alive;
-        });
-
-        // Update score popups
-        this.scorePopups = this.scorePopups.filter(s => {
-            s.update();
-            return s.alive;
         });
 
         // Update drop trails
@@ -1110,7 +981,7 @@ class Game {
             } else {
                 const progress = 1 - (this.clearAnimTimer / this.clearAnimDuration);
                 const flashOn = Math.floor(progress * 6) % 2 === 0;
-                this.renderer.draw(this.activeTetromino, this.clearingLines, flashOn, this.dropTrails, this.particles, this.scorePopups);
+                this.renderer.draw(this.activeTetromino, this.clearingLines, flashOn, this.dropTrails, this.particles);
                 requestAnimationFrame(this.loop);
                 return;
             }
@@ -1138,7 +1009,7 @@ class Game {
             }
         }
 
-        this.renderer.draw(this.activeTetromino, [], false, this.dropTrails, this.particles, this.scorePopups);
+        this.renderer.draw(this.activeTetromino, [], false, this.dropTrails, this.particles);
         requestAnimationFrame(this.loop);
     }
 }

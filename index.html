@@ -21,10 +21,6 @@
                     <div class="score-label">LEVEL</div>
                     <div id="level">1</div>
                 </div>
-                <div class="score-board">
-                    <div class="score-label">LINES</div>
-                    <div id="lines">0</div>
-                </div>
                 <div class="score-board high-score-board">
                     <div class="score-label">BEST</div>
                     <div id="high-score">0</div>
@@ -34,20 +30,16 @@
                         <div class="score-label">NEXT</div>
                         <canvas id="preview-canvas" width="100" height="100"></canvas>
                     </div>
-                    <div class="preview-box">
-                        <div class="score-label">HOLD</div>
-                        <canvas id="hold-canvas" width="100" height="100"></canvas>
-                    </div>
                 </div>
                 <div class="controls-info">
                     <p><span>←</span> <span>→</span> Move</p>
                     <p><span>↑</span> Rotate</p>
                     <p><span>↓</span> Soft drop</p>
                     <p><span>Space</span> Hard drop</p>
-                    <p><span>C</span> Hold</p>
                     <p><span>Esc</span> Pause</p>
                 </div>
                 <button id="action-btn">I CAN HAS GAME?</button>
+                <button id="mute-btn">🔊</button>
             </div>
             <canvas id="game-canvas"></canvas>
 
@@ -56,17 +48,10 @@
                 <img id="reward-image" src="" alt="Reward Cat">
             </div>
 
-            <!-- Mobile touch buttons -->
-            <div class="mobile-controls">
-                <button id="hold-btn" class="mobile-btn">HOLD</button>
-                <button id="hard-drop-btn" class="mobile-btn">DROP</button>
-            </div>
-
             <div id="game-over-overlay" class="overlay hidden">
                 <h2>OH NOES!</h2>
                 <p>Score: <span id="final-score">0</span></p>
                 <p class="high-score-line">Best: <span id="high-score-overlay">0</span></p>
-                <p id="new-best-label" class="new-best hidden">NEW BEST!</p>
                 <button id="restart-btn">PLZ PLAY AGAIN?</button>
             </div>
             <div id="pause-overlay" class="overlay hidden">
